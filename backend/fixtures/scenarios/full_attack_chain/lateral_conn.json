@@ -1,0 +1,1 @@
+{"ts":"2026-09-07T08:02:00Z","uid":"LAT-SMB-01","id.orig_h":"10.10.20.15","id.orig_p":55001,"id.resp_h":"10.10.30.20","id.resp_p":445,"proto":"tcp","service":"smb","duration":1.2,"orig_bytes":1240,"resp_bytes":920,"orig_pkts":8,"resp_pkts":7,"conn_state":"SF"}

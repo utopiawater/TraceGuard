@@ -1,0 +1,51 @@
+from uuid import uuid4
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+
+from app.api.dependencies import graph, investigation_service, repository
+from app.agents.service import InvestigationService
+from app.api.envelope import response
+from app.repositories import SQLiteRepository
+
+router = APIRouter(tags=["investigation"])
+
+
+@router.get("/detections")
+def detections(limit: int = Query(default=100, ge=1, le=500), repo: SQLiteRepository = Depends(repository)) -> dict:
+    return response([item.model_dump(mode="json") for item in repo.list_detections(limit)])
+
+
+@router.get("/alerts")
+def alerts(repo: SQLiteRepository = Depends(repository)) -> dict:
+    values = [{"alert_id": item.detection_id, "detection_id": item.detection_id, "title": item.title, "severity": item.severity, "status": item.status, "evidence_count": len(item.evidence_ids)} for item in repo.list_detections(500)]
+    return response(values)
+
+
+@router.get("/chains")
+def chains(limit: int = Query(default=100, ge=1, le=500), repo: SQLiteRepository = Depends(repository)) -> dict:
+    return response([item.model_dump(mode="json") for item in repo.list_chains(limit)])
+
+
+@router.get("/chains/{chain_id}")
+def chain(chain_id: str, repo: SQLiteRepository = Depends(repository)) -> dict:
+    item = next((value for value in repo.list_chains(500) if value.chain_id == chain_id), None)
+    if not item:
+        raise HTTPException(status_code=404, detail="attack chain not found")
+    return response(item.model_dump(mode="json"))
+
+
+@router.post("/chains/{chain_id}/investigate")
+def investigate_chain(chain_id: str, background: BackgroundTasks, repo: SQLiteRepository = Depends(repository), service: InvestigationService = Depends(investigation_service)) -> dict:
+    if not repo.get_chain(chain_id):
+        raise HTTPException(status_code=404, detail="attack chain not found")
+    case_id = "case_%s" % uuid4().hex[:16]
+    background.add_task(service.investigate, chain_id, case_id)
+    return response({"case_id": case_id, "chain_id": chain_id, "status": "queued"})
+
+
+@router.get("/graph")
+def graph_slice(projector=Depends(graph)) -> dict:
+    nodes = list(projector.entities.values())[:100]
+    node_ids = {item.entity_id for item in nodes}
+    edges = [item for item in projector.relations.values() if item.source_entity_id in node_ids and item.target_entity_id in node_ids][:200]
+    return response({"nodes": [item.model_dump(mode="json") for item in nodes], "edges": [item.model_dump(mode="json") for item in edges], "limit": 100, "runtime": projector.status() if hasattr(projector, "status") else {"configured": False, "connected": False, "backend": "memory"}})

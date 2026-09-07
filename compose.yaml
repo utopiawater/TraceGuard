@@ -1,0 +1,76 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: deploy/backend.Dockerfile
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    environment:
+      TRACEGUARD_MODE: ${TRACEGUARD_MODE:-replay}
+      TRACEGUARD_DATA_DIR: /data
+      TRACEGUARD_DATABASE_PATH: /data/traceguard.db
+      TRACEGUARD_RAW_ARCHIVE_DIR: /data/raw
+      TRACEGUARD_NEO4J_URI: bolt://neo4j:7687
+      TRACEGUARD_NEO4J_USER: neo4j
+      TRACEGUARD_NEO4J_PASSWORD: ${NEO4J_PASSWORD:?set NEO4J_PASSWORD in .env}
+    volumes:
+      - traceguard-data:/data
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/system/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      neo4j:
+        condition: service_healthy
+
+  neo4j:
+    image: neo4j:5.26-community
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:?set NEO4J_PASSWORD in .env}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:?set NEO4J_PASSWORD in .env}
+    volumes:
+      - neo4j-data:/data
+      - ./deploy/neo4j/schema.cypher:/var/lib/neo4j/import/schema.cypher:ro
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p $$NEO4J_AUTH_PASSWORD 'RETURN 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    build:
+      context: .
+      dockerfile: deploy/backend.Dockerfile
+    command: python -m app.worker
+    environment:
+      TRACEGUARD_MODE: ${TRACEGUARD_MODE:-replay}
+      TRACEGUARD_DATA_DIR: /data
+      TRACEGUARD_DATABASE_PATH: /data/traceguard.db
+      TRACEGUARD_RAW_ARCHIVE_DIR: /data/raw
+      TRACEGUARD_NEO4J_URI: bolt://neo4j:7687
+      TRACEGUARD_NEO4J_USER: neo4j
+      TRACEGUARD_NEO4J_PASSWORD: ${NEO4J_PASSWORD:?set NEO4J_PASSWORD in .env}
+    volumes:
+      - traceguard-data:/data
+    depends_on:
+      api:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/frontend.Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+
+volumes:
+  traceguard-data:
+  neo4j-data:

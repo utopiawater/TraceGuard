@@ -1,0 +1,297 @@
+{
+  "$defs": {
+    "ChainStep": {
+      "additionalProperties": false,
+      "properties": {
+        "step_id": {
+          "title": "Step Id",
+          "type": "string"
+        },
+        "stage": {
+          "enum": [
+            "initial_access",
+            "execution",
+            "persistence",
+            "privilege_escalation",
+            "credential_access",
+            "discovery",
+            "lateral_movement",
+            "collection",
+            "command_and_control",
+            "exfiltration"
+          ],
+          "title": "Stage",
+          "type": "string"
+        },
+        "tactic_id": {
+          "title": "Tactic Id",
+          "type": "string"
+        },
+        "technique_id": {
+          "title": "Technique Id",
+          "type": "string"
+        },
+        "event_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Event Ids",
+          "type": "array"
+        },
+        "detection_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Detection Ids",
+          "type": "array"
+        },
+        "entity_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Entity Ids",
+          "type": "array"
+        },
+        "session_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Session Ids",
+          "type": "array"
+        },
+        "predecessors": {
+          "items": {
+            "$ref": "#/$defs/StepPredecessor"
+          },
+          "title": "Predecessors",
+          "type": "array"
+        },
+        "start_time": {
+          "format": "date-time",
+          "title": "Start Time",
+          "type": "string"
+        },
+        "end_time": {
+          "format": "date-time",
+          "title": "End Time",
+          "type": "string"
+        },
+        "score": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Score",
+          "type": "number"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "explanation": {
+          "title": "Explanation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "step_id",
+        "stage",
+        "tactic_id",
+        "technique_id",
+        "start_time",
+        "end_time",
+        "score",
+        "evidence_ids",
+        "explanation"
+      ],
+      "title": "ChainStep",
+      "type": "object"
+    },
+    "ChainStepRef": {
+      "additionalProperties": false,
+      "properties": {
+        "step_id": {
+          "title": "Step Id",
+          "type": "string"
+        },
+        "stage": {
+          "title": "Stage",
+          "type": "string"
+        }
+      },
+      "required": [
+        "step_id",
+        "stage"
+      ],
+      "title": "ChainStepRef",
+      "type": "object"
+    },
+    "StepPredecessor": {
+      "additionalProperties": false,
+      "properties": {
+        "step_id": {
+          "title": "Step Id",
+          "type": "string"
+        },
+        "relation": {
+          "enum": [
+            "temporal",
+            "spawn",
+            "same_session",
+            "authentication",
+            "network_flow",
+            "file_lineage",
+            "identity_change",
+            "analyst_link"
+          ],
+          "title": "Relation",
+          "type": "string"
+        },
+        "score": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Score",
+          "type": "number"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "step_id",
+        "relation",
+        "score"
+      ],
+      "title": "StepPredecessor",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "chain_id": {
+      "title": "Chain Id",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "status": {
+      "default": "candidate",
+      "enum": [
+        "candidate",
+        "confirmed",
+        "dismissed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "start_time": {
+      "format": "date-time",
+      "title": "Start Time",
+      "type": "string"
+    },
+    "end_time": {
+      "format": "date-time",
+      "title": "End Time",
+      "type": "string"
+    },
+    "entry_point": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ChainStepRef"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/ChainStep"
+      },
+      "title": "Steps",
+      "type": "array"
+    },
+    "entity_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Entity Ids",
+      "type": "array"
+    },
+    "detection_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Detection Ids",
+      "type": "array"
+    },
+    "technique_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Technique Ids",
+      "type": "array"
+    },
+    "score": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Score",
+      "type": "number"
+    },
+    "completeness": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Completeness",
+      "type": "number"
+    },
+    "uncertainties": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Uncertainties",
+      "type": "array"
+    },
+    "evidence_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Evidence Ids",
+      "type": "array"
+    },
+    "algorithm_version": {
+      "title": "Algorithm Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "chain_id",
+    "run_id",
+    "title",
+    "start_time",
+    "end_time",
+    "steps",
+    "score",
+    "completeness",
+    "evidence_ids",
+    "algorithm_version"
+  ],
+  "title": "AttackChain",
+  "type": "object"
+}

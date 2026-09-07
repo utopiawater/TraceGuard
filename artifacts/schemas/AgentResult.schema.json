@@ -1,0 +1,182 @@
+{
+  "$defs": {
+    "AgentFinding": {
+      "additionalProperties": false,
+      "properties": {
+        "claim": {
+          "title": "Claim",
+          "type": "string"
+        },
+        "confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "alternatives": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Alternatives",
+          "type": "array"
+        }
+      },
+      "required": [
+        "claim",
+        "confidence",
+        "evidence_ids"
+      ],
+      "title": "AgentFinding",
+      "type": "object"
+    },
+    "ModelInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "prompt_version": {
+          "title": "Prompt Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "model",
+        "prompt_version"
+      ],
+      "title": "ModelInfo",
+      "type": "object"
+    },
+    "StructuredError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "retryable": {
+          "default": false,
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "StructuredError",
+      "type": "object"
+    },
+    "ToolCallSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        },
+        "input_summary": {
+          "title": "Input Summary",
+          "type": "object"
+        },
+        "output_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Output Refs",
+          "type": "array"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "denied"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool",
+        "status"
+      ],
+      "title": "ToolCallSummary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "result_id": {
+      "title": "Result Id",
+      "type": "string"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "succeeded",
+        "partial",
+        "failed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/AgentFinding"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "tool_calls": {
+      "items": {
+        "$ref": "#/$defs/ToolCallSummary"
+      },
+      "title": "Tool Calls",
+      "type": "array"
+    },
+    "output_refs": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Output Refs",
+      "type": "array"
+    },
+    "errors": {
+      "items": {
+        "$ref": "#/$defs/StructuredError"
+      },
+      "title": "Errors",
+      "type": "array"
+    },
+    "model_info": {
+      "$ref": "#/$defs/ModelInfo"
+    }
+  },
+  "required": [
+    "result_id",
+    "task_id",
+    "status",
+    "model_info"
+  ],
+  "title": "AgentResult",
+  "type": "object"
+}

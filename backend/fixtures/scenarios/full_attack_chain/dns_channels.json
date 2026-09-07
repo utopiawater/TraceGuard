@@ -1,0 +1,9 @@
+[
+ {"ts":"2026-09-07T08:01:00Z","uid":"DNS-A1","id.orig_h":"10.10.20.15","id.orig_p":53001,"id.resp_h":"10.10.40.53","id.resp_p":53,"proto":"udp","query":"MFRGGZDFMZTWQ2LKNNWG23TPOI5DCMRUGQ2A.exfil.example","qtype_name":"TXT","rcode_name":"NOERROR"},
+ {"ts":"2026-09-07T08:01:02Z","uid":"DNS-A2","id.orig_h":"10.10.20.15","id.orig_p":53002,"id.resp_h":"10.10.40.53","id.resp_p":53,"proto":"udp","query":"JBSWY3DPEBLW64TMMQQHI2DFEB2GQZJANVQW4ZJAMJQX.exfil.example","qtype_name":"TXT","rcode_name":"NOERROR"},
+ {"ts":"2026-09-07T08:01:04Z","uid":"DNS-A3","id.orig_h":"10.10.20.15","id.orig_p":53003,"id.resp_h":"10.10.40.53","id.resp_p":53,"proto":"udp","query":"KRUGS4ZANFZSAYJAN5XGK3TFOIQG65LTMVXHI2LOM4.exfil.example","qtype_name":"TXT","rcode_name":"NXDOMAIN"},
+ {"ts":"2026-09-07T08:01:06Z","uid":"DNS-A4","id.orig_h":"10.10.20.15","id.orig_p":53004,"id.resp_h":"10.10.40.53","id.resp_p":53,"proto":"udp","query":"ONSWG4TFOQWCAZDJNZTSA5DFEBWGK4TFMF2GQZLUEB.exfil.example","qtype_name":"TXT","rcode_name":"NOERROR"},
+ {"ts":"2026-09-07T08:01:08Z","uid":"DNS-N1","id.orig_h":"10.10.20.15","id.orig_p":53101,"id.resp_h":"10.10.40.53","id.resp_p":53,"proto":"udp","query":"www.example.org","qtype_name":"A","rcode_name":"NOERROR"},
+ {"ts":"2026-09-07T08:01:09Z","uid":"DNS-N2","id.orig_h":"10.10.20.15","id.orig_p":53102,"id.resp_h":"10.10.40.53","id.resp_p":53,"proto":"udp","query":"api.example.org","qtype_name":"A","rcode_name":"NOERROR"},
+ {"ts":"2026-09-07T08:01:10Z","uid":"DNS-N3","id.orig_h":"10.10.20.15","id.orig_p":53103,"id.resp_h":"10.10.40.53","id.resp_p":53,"proto":"udp","query":"cdn.example.org","qtype_name":"AAAA","rcode_name":"NOERROR"}
+]

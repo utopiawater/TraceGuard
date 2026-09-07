@@ -1,0 +1,5 @@
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+  <System><Provider Name="Microsoft-Windows-Security-Auditing" Guid="{54849625-5478-4994-A5BA-3E3B0328C30D}"/><EventID>4624</EventID><Version>2</Version><Level>0</Level><Task>12544</Task><Opcode>0</Opcode><Keywords>0x8020000000000000</Keywords><TimeCreated SystemTime="2026-09-07T08:00:00.0000000Z"/><EventRecordID>8801</EventRecordID><Computer>win-client-01.corp.lab</Computer><Security/></System>
+  <EventData><Data Name="SubjectUserSid">S-1-0-0</Data><Data Name="SubjectUserName">-</Data><Data Name="TargetUserSid">S-1-5-21-1000-1000-1000-1105</Data><Data Name="TargetUserName">student</Data><Data Name="TargetDomainName">CORP</Data><Data Name="TargetLogonId">0x8A91C</Data><Data Name="LogonType">10</Data><Data Name="LogonProcessName">User32</Data><Data Name="AuthenticationPackageName">Negotiate</Data><Data Name="WorkstationName">JUMP-01</Data><Data Name="IpAddress">10.10.10.25</Data><Data Name="IpPort">51842</Data></EventData>
+</Event>
+

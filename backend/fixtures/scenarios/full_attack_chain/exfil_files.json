@@ -1,0 +1,1 @@
+{"ts":"2026-09-07T08:03:00Z","uid":"EXFIL-FILE-01","id.orig_h":"10.10.30.20","id.orig_p":56001,"id.resp_h":"203.0.113.77","id.resp_p":443,"proto":"tcp","service":"https","fuid":"F-ARCHIVE-01","filename":"finance-archive.tar.gz","mime_type":"application/gzip","orig_bytes":850000,"resp_bytes":1200,"orig_pkts":610,"resp_pkts":14,"duration":8.5}

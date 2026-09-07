@@ -1,0 +1,10 @@
+[
+ {"ts":"2026-09-07T08:01:40Z","uid":"ICMP-A1","id.orig_h":"10.10.20.15","id.orig_p":0,"id.resp_h":"10.10.40.70","id.resp_p":0,"proto":"icmp","icmp_type":8,"icmp_code":0,"payload_len":96,"payload_entropy":5.8},
+ {"ts":"2026-09-07T08:01:42Z","uid":"ICMP-A2","id.orig_h":"10.10.20.15","id.orig_p":0,"id.resp_h":"10.10.40.70","id.resp_p":0,"proto":"icmp","icmp_type":8,"icmp_code":0,"payload_len":96,"payload_entropy":5.7},
+ {"ts":"2026-09-07T08:01:44Z","uid":"ICMP-A3","id.orig_h":"10.10.20.15","id.orig_p":0,"id.resp_h":"10.10.40.70","id.resp_p":0,"proto":"icmp","icmp_type":8,"icmp_code":0,"payload_len":96,"payload_entropy":5.9},
+ {"ts":"2026-09-07T08:01:46Z","uid":"ICMP-A4","id.orig_h":"10.10.20.15","id.orig_p":0,"id.resp_h":"10.10.40.70","id.resp_p":0,"proto":"icmp","icmp_type":8,"icmp_code":0,"payload_len":96,"payload_entropy":5.8},
+ {"ts":"2026-09-07T08:01:48Z","uid":"ICMP-N1","id.orig_h":"10.10.20.15","id.orig_p":0,"id.resp_h":"10.10.40.71","id.resp_p":0,"proto":"icmp","icmp_type":8,"icmp_code":0,"payload_len":16,"payload_entropy":1.2},
+ {"ts":"2026-09-07T08:01:51Z","uid":"ICMP-N2","id.orig_h":"10.10.20.15","id.orig_p":0,"id.resp_h":"10.10.40.71","id.resp_p":0,"proto":"icmp","icmp_type":8,"icmp_code":0,"payload_len":16,"payload_entropy":1.1},
+ {"ts":"2026-09-07T08:01:56Z","uid":"ICMP-N3","id.orig_h":"10.10.20.15","id.orig_p":0,"id.resp_h":"10.10.40.71","id.resp_p":0,"proto":"icmp","icmp_type":8,"icmp_code":0,"payload_len":16,"payload_entropy":1.3},
+ {"ts":"2026-09-07T08:02:05Z","uid":"ICMP-N4","id.orig_h":"10.10.20.15","id.orig_p":0,"id.resp_h":"10.10.40.71","id.resp_p":0,"proto":"icmp","icmp_type":8,"icmp_code":0,"payload_len":16,"payload_entropy":1.2}
+]

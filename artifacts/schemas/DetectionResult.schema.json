@@ -1,0 +1,185 @@
+{
+  "$defs": {
+    "AttackMapping": {
+      "additionalProperties": false,
+      "properties": {
+        "technique_id": {
+          "title": "Technique Id",
+          "type": "string"
+        },
+        "subtechnique_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Subtechnique Id"
+        },
+        "tactic_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tactic Ids",
+          "type": "array"
+        },
+        "mapping_rule_id": {
+          "title": "Mapping Rule Id",
+          "type": "string"
+        },
+        "attack_version": {
+          "title": "Attack Version",
+          "type": "string"
+        },
+        "confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        }
+      },
+      "required": [
+        "technique_id",
+        "tactic_ids",
+        "mapping_rule_id",
+        "attack_version",
+        "confidence"
+      ],
+      "title": "AttackMapping",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "detection_id": {
+      "title": "Detection Id",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "rule_id": {
+      "title": "Rule Id",
+      "type": "string"
+    },
+    "rule_version": {
+      "title": "Rule Version",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "detector_type": {
+      "enum": [
+        "rule",
+        "threshold",
+        "statistical",
+        "correlation"
+      ],
+      "title": "Detector Type",
+      "type": "string"
+    },
+    "status": {
+      "default": "open",
+      "enum": [
+        "open",
+        "suppressed",
+        "confirmed",
+        "false_positive"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "severity": {
+      "enum": [
+        "informational",
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "confidence": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "event_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Event Ids",
+      "type": "array"
+    },
+    "entity_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Entity Ids",
+      "type": "array"
+    },
+    "session_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Session Ids",
+      "type": "array"
+    },
+    "feature_values": {
+      "title": "Feature Values",
+      "type": "object"
+    },
+    "reason": {
+      "title": "Reason",
+      "type": "string"
+    },
+    "attack_mappings": {
+      "items": {
+        "$ref": "#/$defs/AttackMapping"
+      },
+      "title": "Attack Mappings",
+      "type": "array"
+    },
+    "evidence_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Evidence Ids",
+      "type": "array"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "detection_id",
+    "run_id",
+    "rule_id",
+    "rule_version",
+    "title",
+    "detector_type",
+    "severity",
+    "confidence",
+    "event_ids",
+    "reason",
+    "evidence_ids",
+    "created_at"
+  ],
+  "title": "DetectionResult",
+  "type": "object"
+}

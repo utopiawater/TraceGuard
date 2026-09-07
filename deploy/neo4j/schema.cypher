@@ -1,0 +1,17 @@
+CREATE CONSTRAINT host_id IF NOT EXISTS FOR (n:Host) REQUIRE n.entity_id IS UNIQUE;
+CREATE CONSTRAINT user_id IF NOT EXISTS FOR (n:User) REQUIRE n.entity_id IS UNIQUE;
+CREATE CONSTRAINT process_id IF NOT EXISTS FOR (n:Process) REQUIRE n.entity_id IS UNIQUE;
+CREATE CONSTRAINT file_id IF NOT EXISTS FOR (n:File) REQUIRE n.entity_id IS UNIQUE;
+CREATE CONSTRAINT registry_id IF NOT EXISTS FOR (n:Registry) REQUIRE n.entity_id IS UNIQUE;
+CREATE CONSTRAINT ip_id IF NOT EXISTS FOR (n:IP) REQUIRE n.entity_id IS UNIQUE;
+CREATE CONSTRAINT domain_id IF NOT EXISTS FOR (n:Domain) REQUIRE n.entity_id IS UNIQUE;
+CREATE CONSTRAINT session_id IF NOT EXISTS FOR (n:Session) REQUIRE n.entity_id IS UNIQUE;
+CREATE CONSTRAINT alert_id IF NOT EXISTS FOR (n:Alert) REQUIRE n.entity_id IS UNIQUE;
+CREATE CONSTRAINT technique_id IF NOT EXISTS FOR (n:Technique) REQUIRE n.entity_id IS UNIQUE;
+CREATE CONSTRAINT c2_id IF NOT EXISTS FOR (n:C2) REQUIRE n.entity_id IS UNIQUE;
+CREATE CONSTRAINT evidence_id IF NOT EXISTS FOR (n:Evidence) REQUIRE n.entity_id IS UNIQUE;
+CREATE INDEX process_image IF NOT EXISTS FOR (n:Process) ON (n.image);
+CREATE INDEX file_path IF NOT EXISTS FOR (n:File) ON (n.normalized_path);
+CREATE INDEX ip_address IF NOT EXISTS FOR (n:IP) ON (n.address);
+CREATE INDEX host_last_seen IF NOT EXISTS FOR (n:Host) ON (n.last_seen);
+CREATE INDEX session_start_time IF NOT EXISTS FOR (n:Session) ON (n.start_time);

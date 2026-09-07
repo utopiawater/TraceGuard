@@ -1,0 +1,90 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "relation_id": {
+      "title": "Relation Id",
+      "type": "string"
+    },
+    "relation_type": {
+      "title": "Relation Type",
+      "type": "string"
+    },
+    "source_entity_id": {
+      "title": "Source Entity Id",
+      "type": "string"
+    },
+    "target_entity_id": {
+      "title": "Target Entity Id",
+      "type": "string"
+    },
+    "start_time": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Start Time"
+    },
+    "end_time": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "End Time"
+    },
+    "properties": {
+      "type": "object",
+      "title": "Properties"
+    },
+    "confidence": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "derived": {
+      "default": false,
+      "title": "Derived",
+      "type": "boolean"
+    },
+    "event_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Event Ids",
+      "type": "array"
+    },
+    "evidence_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Evidence Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "relation_id",
+    "relation_type",
+    "source_entity_id",
+    "target_entity_id",
+    "confidence"
+  ],
+  "title": "GraphRelation",
+  "type": "object"
+}

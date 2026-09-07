@@ -1,0 +1,681 @@
+{
+  "$defs": {
+    "ActorContext": {
+      "additionalProperties": false,
+      "properties": {
+        "user": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EntityRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "process": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EntityRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "parent_process": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EntityRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "ActorContext",
+      "type": "object"
+    },
+    "EntityRef": {
+      "additionalProperties": false,
+      "properties": {
+        "entity_type": {
+          "enum": [
+            "host",
+            "user",
+            "process",
+            "file",
+            "registry",
+            "ip",
+            "domain",
+            "session",
+            "c2"
+          ],
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "entity_id": {
+          "title": "Entity Id",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "attributes": {
+          "title": "Attributes",
+          "type": "object"
+        },
+        "identity_quality": {
+          "default": "provisional",
+          "enum": [
+            "exact",
+            "derived",
+            "provisional"
+          ],
+          "title": "Identity Quality",
+          "type": "string"
+        }
+      },
+      "required": [
+        "entity_type",
+        "entity_id"
+      ],
+      "title": "EntityRef",
+      "type": "object"
+    },
+    "EventProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "raw_id": {
+          "title": "Raw Id",
+          "type": "string"
+        },
+        "raw_ref": {
+          "title": "Raw Ref",
+          "type": "string"
+        },
+        "raw_sha256": {
+          "title": "Raw Sha256",
+          "type": "string"
+        },
+        "parser_name": {
+          "title": "Parser Name",
+          "type": "string"
+        },
+        "parser_version": {
+          "title": "Parser Version",
+          "type": "string"
+        },
+        "mapping_warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Mapping Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "raw_id",
+        "raw_ref",
+        "raw_sha256",
+        "parser_name",
+        "parser_version"
+      ],
+      "title": "EventProvenance",
+      "type": "object"
+    },
+    "NetworkContext": {
+      "additionalProperties": false,
+      "properties": {
+        "session_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Id"
+        },
+        "direction": {
+          "default": "unknown",
+          "enum": [
+            "inbound",
+            "outbound",
+            "lateral",
+            "unknown"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "transport": {
+          "anyOf": [
+            {
+              "enum": [
+                "tcp",
+                "udp",
+                "icmp",
+                "other"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Transport"
+        },
+        "application": {
+          "anyOf": [
+            {
+              "enum": [
+                "dns",
+                "http",
+                "https",
+                "ssh",
+                "smb",
+                "rdp",
+                "smtp",
+                "other"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Application"
+        },
+        "src": {
+          "$ref": "#/$defs/NetworkEndpoint"
+        },
+        "dst": {
+          "$ref": "#/$defs/NetworkEndpoint"
+        },
+        "bytes_sent": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bytes Sent"
+        },
+        "bytes_received": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bytes Received"
+        },
+        "packets_sent": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Packets Sent"
+        },
+        "packets_received": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Packets Received"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Ms"
+        },
+        "zeek_uid": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Zeek Uid"
+        },
+        "dns": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dns"
+        },
+        "http": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Http"
+        },
+        "icmp": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Icmp"
+        }
+      },
+      "title": "NetworkContext",
+      "type": "object"
+    },
+    "NetworkEndpoint": {
+      "additionalProperties": false,
+      "properties": {
+        "ip": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ip"
+        },
+        "port": {
+          "anyOf": [
+            {
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Port"
+        },
+        "host_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Host Id"
+        }
+      },
+      "title": "NetworkEndpoint",
+      "type": "object"
+    },
+    "ObjectContext": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "anyOf": [
+            {
+              "enum": [
+                "process",
+                "file",
+                "registry",
+                "user",
+                "host",
+                "network",
+                "memory",
+                "service",
+                "other"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Type"
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EntityRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "ObjectContext",
+      "type": "object"
+    },
+    "SourceDescriptor": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/SourceKind"
+        },
+        "product": {
+          "title": "Product",
+          "type": "string"
+        },
+        "dataset": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dataset"
+        },
+        "sensor_id": {
+          "title": "Sensor Id",
+          "type": "string"
+        },
+        "host_hint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Host Hint"
+        },
+        "source_record_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Record Id"
+        }
+      },
+      "required": [
+        "kind",
+        "product",
+        "sensor_id"
+      ],
+      "title": "SourceDescriptor",
+      "type": "object"
+    },
+    "SourceKind": {
+      "enum": [
+        "wazuh",
+        "sysmon",
+        "windows_security",
+        "auditd",
+        "zeek",
+        "dataset",
+        "firewall",
+        "application"
+      ],
+      "title": "SourceKind",
+      "type": "string"
+    },
+    "TimeContext": {
+      "additionalProperties": false,
+      "properties": {
+        "original": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Original"
+        },
+        "clock_offset_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clock Offset Ms"
+        },
+        "uncertainty_ms": {
+          "default": 0,
+          "minimum": 0.0,
+          "title": "Uncertainty Ms",
+          "type": "number"
+        },
+        "quality": {
+          "default": "unknown",
+          "enum": [
+            "synced",
+            "estimated",
+            "unsynced",
+            "unknown"
+          ],
+          "title": "Quality",
+          "type": "string"
+        }
+      },
+      "title": "TimeContext",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "event_id": {
+      "title": "Event Id",
+      "type": "string"
+    },
+    "event_time": {
+      "format": "date-time",
+      "title": "Event Time",
+      "type": "string"
+    },
+    "observed_time": {
+      "format": "date-time",
+      "title": "Observed Time",
+      "type": "string"
+    },
+    "ingested_time": {
+      "format": "date-time",
+      "title": "Ingested Time",
+      "type": "string"
+    },
+    "time": {
+      "$ref": "#/$defs/TimeContext"
+    },
+    "source": {
+      "$ref": "#/$defs/SourceDescriptor"
+    },
+    "host": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EntityRef"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "actor": {
+      "$ref": "#/$defs/ActorContext"
+    },
+    "object": {
+      "$ref": "#/$defs/ObjectContext"
+    },
+    "network": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/NetworkContext"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "action": {
+      "title": "Action",
+      "type": "string"
+    },
+    "event_type": {
+      "title": "Event Type",
+      "type": "string"
+    },
+    "outcome": {
+      "default": "unknown",
+      "enum": [
+        "success",
+        "failure",
+        "unknown"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "severity": {
+      "default": "unknown",
+      "enum": [
+        "informational",
+        "low",
+        "medium",
+        "high",
+        "critical",
+        "unknown"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "message": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Message"
+    },
+    "tags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    },
+    "extensions": {
+      "title": "Extensions",
+      "type": "object"
+    },
+    "provenance": {
+      "$ref": "#/$defs/EventProvenance"
+    }
+  },
+  "required": [
+    "event_id",
+    "event_time",
+    "observed_time",
+    "ingested_time",
+    "time",
+    "source",
+    "action",
+    "event_type",
+    "provenance"
+  ],
+  "title": "UnifiedSecurityEvent",
+  "type": "object"
+}

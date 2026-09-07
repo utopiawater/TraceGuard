@@ -1,0 +1,30 @@
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from app.api.dependencies import repository
+from app.api.envelope import response
+from app.repositories import SQLiteRepository
+
+router = APIRouter(tags=["events"])
+
+
+@router.get("/events")
+def events(limit: int = Query(default=100, ge=1, le=500), repo: SQLiteRepository = Depends(repository)) -> dict:
+    return response([item.model_dump(mode="json") for item in repo.list_events(limit)])
+
+
+@router.get("/sessions")
+def sessions(limit: int = Query(default=100, ge=1, le=500), repo: SQLiteRepository = Depends(repository)) -> dict:
+    return response([item.model_dump(mode="json") for item in repo.list_sessions(limit)])
+
+
+@router.get("/evidence")
+def evidence(limit: int = Query(default=100, ge=1, le=500), repo: SQLiteRepository = Depends(repository)) -> dict:
+    return response([item.model_dump(mode="json") for item in repo.list_evidence(limit)])
+
+
+@router.get("/evidence/{evidence_id}")
+def evidence_detail(evidence_id: str, repo: SQLiteRepository = Depends(repository)) -> dict:
+    item = repo.get_evidence(evidence_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="evidence not found")
+    return response(item.model_dump(mode="json"))

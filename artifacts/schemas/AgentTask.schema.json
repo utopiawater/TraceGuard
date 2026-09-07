@@ -1,0 +1,105 @@
+{
+  "$defs": {
+    "AgentConstraints": {
+      "additionalProperties": false,
+      "properties": {
+        "max_steps": {
+          "default": 8,
+          "maximum": 50,
+          "minimum": 1,
+          "title": "Max Steps",
+          "type": "integer"
+        },
+        "deadline_ms": {
+          "default": 60000,
+          "minimum": 1000,
+          "title": "Deadline Ms",
+          "type": "integer"
+        },
+        "read_only": {
+          "default": true,
+          "title": "Read Only",
+          "type": "boolean"
+        }
+      },
+      "title": "AgentConstraints",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "case_id": {
+      "title": "Case Id",
+      "type": "string"
+    },
+    "agent_role": {
+      "enum": [
+        "coordinator",
+        "host",
+        "network",
+        "correlation",
+        "attribution",
+        "report"
+      ],
+      "title": "Agent Role",
+      "type": "string"
+    },
+    "objective": {
+      "title": "Objective",
+      "type": "string"
+    },
+    "input_refs": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Input Refs",
+      "type": "array"
+    },
+    "allowed_tools": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Allowed Tools",
+      "type": "array"
+    },
+    "constraints": {
+      "$ref": "#/$defs/AgentConstraints"
+    },
+    "parent_task_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parent Task Id"
+    },
+    "state": {
+      "default": "queued",
+      "enum": [
+        "queued",
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ],
+      "title": "State",
+      "type": "string"
+    }
+  },
+  "required": [
+    "task_id",
+    "case_id",
+    "agent_role",
+    "objective"
+  ],
+  "title": "AgentTask",
+  "type": "object"
+}

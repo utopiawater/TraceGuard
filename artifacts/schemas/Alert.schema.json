@@ -1,0 +1,112 @@
+{
+  "$defs": {
+    "Note": {
+      "additionalProperties": false,
+      "properties": {
+        "author": {
+          "title": "Author",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "author",
+        "text",
+        "created_at"
+      ],
+      "title": "Note",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "alert_id": {
+      "title": "Alert Id",
+      "type": "string"
+    },
+    "detection_id": {
+      "title": "Detection Id",
+      "type": "string"
+    },
+    "case_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Case Id"
+    },
+    "status": {
+      "default": "open",
+      "enum": [
+        "open",
+        "acknowledged",
+        "investigating",
+        "closed",
+        "suppressed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "assignee": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Assignee"
+    },
+    "disposition": {
+      "default": "unknown",
+      "enum": [
+        "true_positive",
+        "false_positive",
+        "benign_positive",
+        "unknown"
+      ],
+      "title": "Disposition",
+      "type": "string"
+    },
+    "analyst_notes": {
+      "items": {
+        "$ref": "#/$defs/Note"
+      },
+      "title": "Analyst Notes",
+      "type": "array"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "alert_id",
+    "detection_id",
+    "created_at",
+    "updated_at"
+  ],
+  "title": "Alert",
+  "type": "object"
+}

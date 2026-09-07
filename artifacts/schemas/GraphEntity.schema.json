@@ -1,0 +1,104 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "entity_id": {
+      "title": "Entity Id",
+      "type": "string"
+    },
+    "entity_type": {
+      "enum": [
+        "host",
+        "user",
+        "process",
+        "file",
+        "registry",
+        "ip",
+        "domain",
+        "session",
+        "alert",
+        "technique",
+        "c2",
+        "evidence"
+      ],
+      "title": "Entity Type",
+      "type": "string"
+    },
+    "labels": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Labels",
+      "type": "array"
+    },
+    "display_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Display Name"
+    },
+    "properties": {
+      "type": "object",
+      "title": "Properties"
+    },
+    "first_seen": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "First Seen"
+    },
+    "last_seen": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Seen"
+    },
+    "identity_quality": {
+      "default": "provisional",
+      "enum": [
+        "exact",
+        "derived",
+        "provisional"
+      ],
+      "title": "Identity Quality",
+      "type": "string"
+    },
+    "evidence_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Evidence Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "entity_id",
+    "entity_type"
+  ],
+  "title": "GraphEntity",
+  "type": "object"
+}

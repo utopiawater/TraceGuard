@@ -1,0 +1,15 @@
+{
+  "scenario_id": "powershell-cross-source-001",
+  "title": "Windows 远程登录后 PowerShell 发起跨源可观测连接",
+  "ground_truth": {
+    "stages": ["initial_access", "execution", "command_and_control"],
+    "techniques": ["T1078", "T1059.001", "T1071.001"]
+  },
+  "records": [
+    {"source_kind":"windows_security","dataset":"windows.security","sensor_id":"sensor-win-endpoint-01","source_record_id":"8801","event_time_raw":"2026-09-07T08:00:00.000Z","format":"xml","file":"windows_security_4624.xml"},
+    {"source_kind":"sysmon","dataset":"windows.sysmon","sensor_id":"sensor-win-endpoint-01","source_record_id":"8802","event_time_raw":"2026-09-07T08:00:01.000Z","format":"xml","file":"sysmon_1_process_create.xml"},
+    {"source_kind":"sysmon","dataset":"windows.sysmon","sensor_id":"sensor-win-endpoint-01","source_record_id":"8803","event_time_raw":"2026-09-07T08:00:02.000Z","format":"xml","file":"sysmon_3_network_connect.xml"},
+    {"source_kind":"zeek","dataset":"zeek.conn","sensor_id":"sensor-zeek-internal-01","source_record_id":"C8fbO23r5xZ","event_time_raw":1788768002.35,"format":"json","file":"zeek_conn.json"}
+  ]
+}
+

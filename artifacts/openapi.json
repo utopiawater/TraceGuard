@@ -1,0 +1,2788 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "TraceGuard API",
+    "description": "Evidence-first multi-source attack tracing API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/dashboard": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Dashboard",
+        "operationId": "dashboard_api_dashboard_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Dashboard Api Dashboard Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Events",
+        "operationId": "events_api_events_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Events Api Events Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Sessions",
+        "operationId": "sessions_api_sessions_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Sessions Api Sessions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evidence": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Evidence",
+        "operationId": "evidence_api_evidence_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Evidence Api Evidence Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evidence/{evidence_id}": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Evidence Detail",
+        "operationId": "evidence_detail_api_evidence__evidence_id__get",
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Evidence Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Evidence Detail Api Evidence  Evidence Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/detections": {
+      "get": {
+        "tags": [
+          "investigation"
+        ],
+        "summary": "Detections",
+        "operationId": "detections_api_detections_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Detections Api Detections Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alerts": {
+      "get": {
+        "tags": [
+          "investigation"
+        ],
+        "summary": "Alerts",
+        "operationId": "alerts_api_alerts_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Alerts Api Alerts Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chains": {
+      "get": {
+        "tags": [
+          "investigation"
+        ],
+        "summary": "Chains",
+        "operationId": "chains_api_chains_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Chains Api Chains Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chains/{chain_id}": {
+      "get": {
+        "tags": [
+          "investigation"
+        ],
+        "summary": "Chain",
+        "operationId": "chain_api_chains__chain_id__get",
+        "parameters": [
+          {
+            "name": "chain_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chain Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Chain Api Chains  Chain Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/graph": {
+      "get": {
+        "tags": [
+          "investigation"
+        ],
+        "summary": "Graph Slice",
+        "operationId": "graph_slice_api_graph_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Graph Slice Api Graph Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/entities": {
+      "get": {
+        "tags": [
+          "resources"
+        ],
+        "summary": "Entities",
+        "operationId": "entities_api_entities_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Entities Api Entities Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hosts": {
+      "get": {
+        "tags": [
+          "resources"
+        ],
+        "summary": "Hosts",
+        "operationId": "hosts_api_hosts_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Hosts Api Hosts Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/network": {
+      "get": {
+        "tags": [
+          "resources"
+        ],
+        "summary": "Network",
+        "operationId": "network_api_network_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Network Api Network Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/attack": {
+      "get": {
+        "tags": [
+          "resources"
+        ],
+        "summary": "Attack",
+        "operationId": "attack_api_attack_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Attack Api Attack Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agents": {
+      "get": {
+        "tags": [
+          "resources"
+        ],
+        "summary": "Agents",
+        "operationId": "agents_api_agents_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Agents Api Agents Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/attribution": {
+      "get": {
+        "tags": [
+          "resources"
+        ],
+        "summary": "Attribution",
+        "operationId": "attribution_api_attribution_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Attribution Api Attribution Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/datasets": {
+      "get": {
+        "tags": [
+          "resources"
+        ],
+        "summary": "Datasets",
+        "operationId": "datasets_api_datasets_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Datasets Api Datasets Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports": {
+      "get": {
+        "tags": [
+          "resources"
+        ],
+        "summary": "Reports",
+        "operationId": "reports_api_reports_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Reports Api Reports Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sources": {
+      "get": {
+        "tags": [
+          "resources"
+        ],
+        "summary": "Sources",
+        "operationId": "sources_api_sources_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Sources Api Sources Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/system/health": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Health",
+        "operationId": "health_api_system_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Health Api System Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/system/version": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Version",
+        "operationId": "version_api_system_version_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Version Api System Version Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "ActorContext": {
+        "additionalProperties": false,
+        "properties": {
+          "user": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "process": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "parent_process": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "title": "ActorContext",
+        "type": "object"
+      },
+      "AgentConstraints": {
+        "additionalProperties": false,
+        "properties": {
+          "max_steps": {
+            "default": 8,
+            "maximum": 50,
+            "minimum": 1,
+            "title": "Max Steps",
+            "type": "integer"
+          },
+          "deadline_ms": {
+            "default": 60000,
+            "minimum": 1000,
+            "title": "Deadline Ms",
+            "type": "integer"
+          },
+          "read_only": {
+            "default": true,
+            "title": "Read Only",
+            "type": "boolean"
+          }
+        },
+        "title": "AgentConstraints",
+        "type": "object"
+      },
+      "AgentFinding": {
+        "additionalProperties": false,
+        "properties": {
+          "claim": {
+            "title": "Claim",
+            "type": "string"
+          },
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "alternatives": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Alternatives",
+            "type": "array"
+          }
+        },
+        "required": [
+          "claim",
+          "confidence",
+          "evidence_ids"
+        ],
+        "title": "AgentFinding",
+        "type": "object"
+      },
+      "AgentResult": {
+        "additionalProperties": false,
+        "properties": {
+          "result_id": {
+            "title": "Result Id",
+            "type": "string"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "succeeded",
+              "partial",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/AgentFinding"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "tool_calls": {
+            "items": {
+              "$ref": "#/components/schemas/ToolCallSummary"
+            },
+            "title": "Tool Calls",
+            "type": "array"
+          },
+          "output_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Output Refs",
+            "type": "array"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/StructuredError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "model_info": {
+            "$ref": "#/components/schemas/ModelInfo"
+          }
+        },
+        "required": [
+          "result_id",
+          "task_id",
+          "status",
+          "model_info"
+        ],
+        "title": "AgentResult",
+        "type": "object"
+      },
+      "AgentTask": {
+        "additionalProperties": false,
+        "properties": {
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          },
+          "case_id": {
+            "title": "Case Id",
+            "type": "string"
+          },
+          "agent_role": {
+            "enum": [
+              "coordinator",
+              "host",
+              "network",
+              "correlation",
+              "attribution",
+              "report"
+            ],
+            "title": "Agent Role",
+            "type": "string"
+          },
+          "objective": {
+            "title": "Objective",
+            "type": "string"
+          },
+          "input_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Input Refs",
+            "type": "array"
+          },
+          "allowed_tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Tools",
+            "type": "array"
+          },
+          "constraints": {
+            "$ref": "#/components/schemas/AgentConstraints"
+          },
+          "parent_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Parent Task Id"
+          },
+          "state": {
+            "default": "queued",
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id",
+          "case_id",
+          "agent_role",
+          "objective"
+        ],
+        "title": "AgentTask",
+        "type": "object"
+      },
+      "Alert": {
+        "additionalProperties": false,
+        "properties": {
+          "alert_id": {
+            "title": "Alert Id",
+            "type": "string"
+          },
+          "detection_id": {
+            "title": "Detection Id",
+            "type": "string"
+          },
+          "case_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Case Id"
+          },
+          "status": {
+            "default": "open",
+            "enum": [
+              "open",
+              "acknowledged",
+              "investigating",
+              "closed",
+              "suppressed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "assignee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Assignee"
+          },
+          "disposition": {
+            "default": "unknown",
+            "enum": [
+              "true_positive",
+              "false_positive",
+              "benign_positive",
+              "unknown"
+            ],
+            "title": "Disposition",
+            "type": "string"
+          },
+          "analyst_notes": {
+            "items": {
+              "$ref": "#/components/schemas/Note"
+            },
+            "title": "Analyst Notes",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "alert_id",
+          "detection_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Alert",
+        "type": "object"
+      },
+      "AttackChain": {
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "chain_id": {
+            "title": "Chain Id",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "status": {
+            "default": "candidate",
+            "enum": [
+              "candidate",
+              "confirmed",
+              "dismissed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "start_time": {
+            "format": "date-time",
+            "title": "Start Time",
+            "type": "string"
+          },
+          "end_time": {
+            "format": "date-time",
+            "title": "End Time",
+            "type": "string"
+          },
+          "entry_point": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChainStepRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/ChainStep"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "entity_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Entity Ids",
+            "type": "array"
+          },
+          "detection_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Detection Ids",
+            "type": "array"
+          },
+          "technique_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Technique Ids",
+            "type": "array"
+          },
+          "score": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score",
+            "type": "number"
+          },
+          "completeness": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Completeness",
+            "type": "number"
+          },
+          "uncertainties": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Uncertainties",
+            "type": "array"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "algorithm_version": {
+            "title": "Algorithm Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "chain_id",
+          "run_id",
+          "title",
+          "start_time",
+          "end_time",
+          "steps",
+          "score",
+          "completeness",
+          "evidence_ids",
+          "algorithm_version"
+        ],
+        "title": "AttackChain",
+        "type": "object"
+      },
+      "AttackMapping": {
+        "additionalProperties": false,
+        "properties": {
+          "technique_id": {
+            "title": "Technique Id",
+            "type": "string"
+          },
+          "subtechnique_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtechnique Id"
+          },
+          "tactic_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tactic Ids",
+            "type": "array"
+          },
+          "mapping_rule_id": {
+            "title": "Mapping Rule Id",
+            "type": "string"
+          },
+          "attack_version": {
+            "title": "Attack Version",
+            "type": "string"
+          },
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          }
+        },
+        "required": [
+          "technique_id",
+          "tactic_ids",
+          "mapping_rule_id",
+          "attack_version",
+          "confidence"
+        ],
+        "title": "AttackMapping",
+        "type": "object"
+      },
+      "ChainStep": {
+        "additionalProperties": false,
+        "properties": {
+          "step_id": {
+            "title": "Step Id",
+            "type": "string"
+          },
+          "stage": {
+            "enum": [
+              "initial_access",
+              "execution",
+              "persistence",
+              "privilege_escalation",
+              "credential_access",
+              "discovery",
+              "lateral_movement",
+              "collection",
+              "command_and_control",
+              "exfiltration"
+            ],
+            "title": "Stage",
+            "type": "string"
+          },
+          "tactic_id": {
+            "title": "Tactic Id",
+            "type": "string"
+          },
+          "technique_id": {
+            "title": "Technique Id",
+            "type": "string"
+          },
+          "event_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Event Ids",
+            "type": "array"
+          },
+          "detection_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Detection Ids",
+            "type": "array"
+          },
+          "entity_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Entity Ids",
+            "type": "array"
+          },
+          "session_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Session Ids",
+            "type": "array"
+          },
+          "predecessors": {
+            "items": {
+              "$ref": "#/components/schemas/StepPredecessor"
+            },
+            "title": "Predecessors",
+            "type": "array"
+          },
+          "start_time": {
+            "format": "date-time",
+            "title": "Start Time",
+            "type": "string"
+          },
+          "end_time": {
+            "format": "date-time",
+            "title": "End Time",
+            "type": "string"
+          },
+          "score": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score",
+            "type": "number"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "explanation": {
+            "title": "Explanation",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step_id",
+          "stage",
+          "tactic_id",
+          "technique_id",
+          "start_time",
+          "end_time",
+          "score",
+          "evidence_ids",
+          "explanation"
+        ],
+        "title": "ChainStep",
+        "type": "object"
+      },
+      "ChainStepRef": {
+        "additionalProperties": false,
+        "properties": {
+          "step_id": {
+            "title": "Step Id",
+            "type": "string"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step_id",
+          "stage"
+        ],
+        "title": "ChainStepRef",
+        "type": "object"
+      },
+      "DetectionResult": {
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "detection_id": {
+            "title": "Detection Id",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "rule_id": {
+            "title": "Rule Id",
+            "type": "string"
+          },
+          "rule_version": {
+            "title": "Rule Version",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "detector_type": {
+            "enum": [
+              "rule",
+              "threshold",
+              "statistical",
+              "correlation"
+            ],
+            "title": "Detector Type",
+            "type": "string"
+          },
+          "status": {
+            "default": "open",
+            "enum": [
+              "open",
+              "suppressed",
+              "confirmed",
+              "false_positive"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "informational",
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "event_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Event Ids",
+            "type": "array"
+          },
+          "entity_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Entity Ids",
+            "type": "array"
+          },
+          "session_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Session Ids",
+            "type": "array"
+          },
+          "feature_values": {
+            "title": "Feature Values",
+            "type": "object"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "attack_mappings": {
+            "items": {
+              "$ref": "#/components/schemas/AttackMapping"
+            },
+            "title": "Attack Mappings",
+            "type": "array"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "detection_id",
+          "run_id",
+          "rule_id",
+          "rule_version",
+          "title",
+          "detector_type",
+          "severity",
+          "confidence",
+          "event_ids",
+          "reason",
+          "evidence_ids",
+          "created_at"
+        ],
+        "title": "DetectionResult",
+        "type": "object"
+      },
+      "EntityRef": {
+        "additionalProperties": false,
+        "properties": {
+          "entity_type": {
+            "enum": [
+              "host",
+              "user",
+              "process",
+              "file",
+              "registry",
+              "ip",
+              "domain",
+              "session",
+              "c2"
+            ],
+            "title": "Entity Type",
+            "type": "string"
+          },
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "string"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Ids",
+            "type": "array"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Display Name"
+          },
+          "attributes": {
+            "title": "Attributes",
+            "type": "object"
+          },
+          "identity_quality": {
+            "default": "provisional",
+            "enum": [
+              "exact",
+              "derived",
+              "provisional"
+            ],
+            "title": "Identity Quality",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entity_type",
+          "entity_id"
+        ],
+        "title": "EntityRef",
+        "type": "object"
+      },
+      "EventProvenance": {
+        "additionalProperties": false,
+        "properties": {
+          "raw_id": {
+            "title": "Raw Id",
+            "type": "string"
+          },
+          "raw_ref": {
+            "title": "Raw Ref",
+            "type": "string"
+          },
+          "raw_sha256": {
+            "title": "Raw Sha256",
+            "type": "string"
+          },
+          "parser_name": {
+            "title": "Parser Name",
+            "type": "string"
+          },
+          "parser_version": {
+            "title": "Parser Version",
+            "type": "string"
+          },
+          "mapping_warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Mapping Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "raw_id",
+          "raw_ref",
+          "raw_sha256",
+          "parser_name",
+          "parser_version"
+        ],
+        "title": "EventProvenance",
+        "type": "object"
+      },
+      "Evidence": {
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "evidence_id": {
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "raw_event",
+              "normalized_event",
+              "graph_fact",
+              "intel_fact",
+              "analytic"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "source_ref": {
+            "title": "Source Ref",
+            "type": "string"
+          },
+          "event_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Event Ids",
+            "type": "array"
+          },
+          "entity_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Entity Ids",
+            "type": "array"
+          },
+          "excerpt": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Excerpt"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Observed At"
+          },
+          "collected_at": {
+            "format": "date-time",
+            "title": "Collected At",
+            "type": "string"
+          },
+          "producer": {
+            "title": "Producer",
+            "type": "string"
+          },
+          "producer_version": {
+            "title": "Producer Version",
+            "type": "string"
+          },
+          "integrity_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Integrity Sha256"
+          },
+          "reliability": {
+            "enum": [
+              "direct",
+              "corroborated",
+              "derived",
+              "external_unverified"
+            ],
+            "title": "Reliability",
+            "type": "string"
+          },
+          "supports": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Supports",
+            "type": "array"
+          },
+          "contradicts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Contradicts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "evidence_id",
+          "kind",
+          "source_ref",
+          "collected_at",
+          "producer",
+          "producer_version",
+          "reliability"
+        ],
+        "title": "Evidence",
+        "type": "object"
+      },
+      "GraphEntity": {
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "string"
+          },
+          "entity_type": {
+            "enum": [
+              "host",
+              "user",
+              "process",
+              "file",
+              "registry",
+              "ip",
+              "domain",
+              "session",
+              "alert",
+              "technique",
+              "c2",
+              "evidence"
+            ],
+            "title": "Entity Type",
+            "type": "string"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Labels",
+            "type": "array"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Display Name"
+          },
+          "properties": {
+            "type": "object",
+            "title": "Properties"
+          },
+          "first_seen": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "First Seen"
+          },
+          "last_seen": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Seen"
+          },
+          "identity_quality": {
+            "default": "provisional",
+            "enum": [
+              "exact",
+              "derived",
+              "provisional"
+            ],
+            "title": "Identity Quality",
+            "type": "string"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entity_id",
+          "entity_type"
+        ],
+        "title": "GraphEntity",
+        "type": "object"
+      },
+      "GraphRelation": {
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "relation_id": {
+            "title": "Relation Id",
+            "type": "string"
+          },
+          "relation_type": {
+            "title": "Relation Type",
+            "type": "string"
+          },
+          "source_entity_id": {
+            "title": "Source Entity Id",
+            "type": "string"
+          },
+          "target_entity_id": {
+            "title": "Target Entity Id",
+            "type": "string"
+          },
+          "start_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Start Time"
+          },
+          "end_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "End Time"
+          },
+          "properties": {
+            "type": "object",
+            "title": "Properties"
+          },
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "derived": {
+            "default": false,
+            "title": "Derived",
+            "type": "boolean"
+          },
+          "event_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Event Ids",
+            "type": "array"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "relation_id",
+          "relation_type",
+          "source_entity_id",
+          "target_entity_id",
+          "confidence"
+        ],
+        "title": "GraphRelation",
+        "type": "object"
+      },
+      "ModelInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "prompt_version": {
+            "title": "Prompt Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "model",
+          "prompt_version"
+        ],
+        "title": "ModelInfo",
+        "type": "object"
+      },
+      "NetworkContext": {
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Session Id"
+          },
+          "direction": {
+            "default": "unknown",
+            "enum": [
+              "inbound",
+              "outbound",
+              "lateral",
+              "unknown"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "transport": {
+            "anyOf": [
+              {
+                "enum": [
+                  "tcp",
+                  "udp",
+                  "icmp",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Transport"
+          },
+          "application": {
+            "anyOf": [
+              {
+                "enum": [
+                  "dns",
+                  "http",
+                  "https",
+                  "ssh",
+                  "smb",
+                  "rdp",
+                  "smtp",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Application"
+          },
+          "src": {
+            "$ref": "#/components/schemas/NetworkEndpoint"
+          },
+          "dst": {
+            "$ref": "#/components/schemas/NetworkEndpoint"
+          },
+          "bytes_sent": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Bytes Sent"
+          },
+          "bytes_received": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Bytes Received"
+          },
+          "packets_sent": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Packets Sent"
+          },
+          "packets_received": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Packets Received"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Duration Ms"
+          },
+          "zeek_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Zeek Uid"
+          },
+          "dns": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Dns"
+          },
+          "http": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Http"
+          },
+          "icmp": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Icmp"
+          }
+        },
+        "title": "NetworkContext",
+        "type": "object"
+      },
+      "NetworkEndpoint": {
+        "additionalProperties": false,
+        "properties": {
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ip"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "maximum": 65535,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Port"
+          },
+          "host_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Host Id"
+          }
+        },
+        "title": "NetworkEndpoint",
+        "type": "object"
+      },
+      "Note": {
+        "additionalProperties": false,
+        "properties": {
+          "author": {
+            "title": "Author",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "author",
+          "text",
+          "created_at"
+        ],
+        "title": "Note",
+        "type": "object"
+      },
+      "ObjectContext": {
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "process",
+                  "file",
+                  "registry",
+                  "user",
+                  "host",
+                  "network",
+                  "memory",
+                  "service",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Type"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "title": "ObjectContext",
+        "type": "object"
+      },
+      "RawEventEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "raw_id": {
+            "title": "Raw Id",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceDescriptor"
+          },
+          "source_record_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Record Id"
+          },
+          "event_time_raw": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Event Time Raw"
+          },
+          "observed_time": {
+            "format": "date-time",
+            "title": "Observed Time",
+            "type": "string"
+          },
+          "ingested_time": {
+            "format": "date-time",
+            "title": "Ingested Time",
+            "type": "string"
+          },
+          "payload_format": {
+            "enum": [
+              "json",
+              "text",
+              "xml",
+              "csv",
+              "pcap_ref"
+            ],
+            "title": "Payload Format",
+            "type": "string"
+          },
+          "payload": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Payload"
+          },
+          "raw_ref": {
+            "title": "Raw Ref",
+            "type": "string"
+          },
+          "raw_sha256": {
+            "title": "Raw Sha256",
+            "type": "string"
+          },
+          "labels": {
+            "title": "Labels",
+            "type": "object"
+          }
+        },
+        "required": [
+          "raw_id",
+          "source",
+          "observed_time",
+          "ingested_time",
+          "payload_format",
+          "raw_ref",
+          "raw_sha256"
+        ],
+        "title": "RawEventEnvelope",
+        "type": "object"
+      },
+      "Session": {
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "session_type": {
+            "enum": [
+              "login",
+              "network"
+            ],
+            "title": "Session Type",
+            "type": "string"
+          },
+          "start_time": {
+            "format": "date-time",
+            "title": "Start Time",
+            "type": "string"
+          },
+          "end_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "End Time"
+          },
+          "state": {
+            "enum": [
+              "active",
+              "closed",
+              "timed_out",
+              "orphan_start",
+              "orphan_end"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "host_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Host Id"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "User Id"
+          },
+          "src_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Src Ip"
+          },
+          "dst_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Dst Ip"
+          },
+          "protocol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Protocol"
+          },
+          "source_event_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Event Ids",
+            "type": "array"
+          },
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          }
+        },
+        "required": [
+          "session_id",
+          "session_type",
+          "start_time",
+          "state",
+          "confidence"
+        ],
+        "title": "Session",
+        "type": "object"
+      },
+      "SourceDescriptor": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/SourceKind"
+          },
+          "product": {
+            "title": "Product",
+            "type": "string"
+          },
+          "dataset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Dataset"
+          },
+          "sensor_id": {
+            "title": "Sensor Id",
+            "type": "string"
+          },
+          "host_hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Host Hint"
+          },
+          "source_record_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Record Id"
+          }
+        },
+        "required": [
+          "kind",
+          "product",
+          "sensor_id"
+        ],
+        "title": "SourceDescriptor",
+        "type": "object"
+      },
+      "SourceKind": {
+        "enum": [
+          "wazuh",
+          "sysmon",
+          "windows_security",
+          "auditd",
+          "zeek",
+          "dataset",
+          "firewall",
+          "application"
+        ],
+        "title": "SourceKind",
+        "type": "string"
+      },
+      "StepPredecessor": {
+        "additionalProperties": false,
+        "properties": {
+          "step_id": {
+            "title": "Step Id",
+            "type": "string"
+          },
+          "relation": {
+            "enum": [
+              "temporal",
+              "spawn",
+              "same_session",
+              "authentication",
+              "network_flow",
+              "file_lineage",
+              "identity_change",
+              "analyst_link"
+            ],
+            "title": "Relation",
+            "type": "string"
+          },
+          "score": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score",
+            "type": "number"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "step_id",
+          "relation",
+          "score"
+        ],
+        "title": "StepPredecessor",
+        "type": "object"
+      },
+      "StructuredError": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "retryable": {
+            "default": false,
+            "title": "Retryable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "StructuredError",
+        "type": "object"
+      },
+      "TimeContext": {
+        "additionalProperties": false,
+        "properties": {
+          "original": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Original"
+          },
+          "clock_offset_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Clock Offset Ms"
+          },
+          "uncertainty_ms": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Uncertainty Ms",
+            "type": "number"
+          },
+          "quality": {
+            "default": "unknown",
+            "enum": [
+              "synced",
+              "estimated",
+              "unsynced",
+              "unknown"
+            ],
+            "title": "Quality",
+            "type": "string"
+          }
+        },
+        "title": "TimeContext",
+        "type": "object"
+      },
+      "ToolCallSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "tool": {
+            "title": "Tool",
+            "type": "string"
+          },
+          "input_summary": {
+            "title": "Input Summary",
+            "type": "object"
+          },
+          "output_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Output Refs",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "succeeded",
+              "failed",
+              "denied"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool",
+          "status"
+        ],
+        "title": "ToolCallSummary",
+        "type": "object"
+      },
+      "UnifiedSecurityEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "event_time": {
+            "format": "date-time",
+            "title": "Event Time",
+            "type": "string"
+          },
+          "observed_time": {
+            "format": "date-time",
+            "title": "Observed Time",
+            "type": "string"
+          },
+          "ingested_time": {
+            "format": "date-time",
+            "title": "Ingested Time",
+            "type": "string"
+          },
+          "time": {
+            "$ref": "#/components/schemas/TimeContext"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceDescriptor"
+          },
+          "host": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "actor": {
+            "$ref": "#/components/schemas/ActorContext"
+          },
+          "object": {
+            "$ref": "#/components/schemas/ObjectContext"
+          },
+          "network": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NetworkContext"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "outcome": {
+            "default": "unknown",
+            "enum": [
+              "success",
+              "failure",
+              "unknown"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "severity": {
+            "default": "unknown",
+            "enum": [
+              "informational",
+              "low",
+              "medium",
+              "high",
+              "critical",
+              "unknown"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Message"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "extensions": {
+            "title": "Extensions",
+            "type": "object"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/EventProvenance"
+          }
+        },
+        "required": [
+          "event_id",
+          "event_time",
+          "observed_time",
+          "ingested_time",
+          "time",
+          "source",
+          "action",
+          "event_type",
+          "provenance"
+        ],
+        "title": "UnifiedSecurityEvent",
+        "type": "object"
+      }
+    }
+  }
+}

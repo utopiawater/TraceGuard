@@ -1,0 +1,181 @@
+{
+  "$defs": {
+    "SourceDescriptor": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/SourceKind"
+        },
+        "product": {
+          "title": "Product",
+          "type": "string"
+        },
+        "dataset": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dataset"
+        },
+        "sensor_id": {
+          "title": "Sensor Id",
+          "type": "string"
+        },
+        "host_hint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Host Hint"
+        },
+        "source_record_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Record Id"
+        }
+      },
+      "required": [
+        "kind",
+        "product",
+        "sensor_id"
+      ],
+      "title": "SourceDescriptor",
+      "type": "object"
+    },
+    "SourceKind": {
+      "enum": [
+        "wazuh",
+        "sysmon",
+        "windows_security",
+        "auditd",
+        "zeek",
+        "dataset",
+        "firewall",
+        "application"
+      ],
+      "title": "SourceKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "raw_id": {
+      "title": "Raw Id",
+      "type": "string"
+    },
+    "source": {
+      "$ref": "#/$defs/SourceDescriptor"
+    },
+    "source_record_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Record Id"
+    },
+    "event_time_raw": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Event Time Raw"
+    },
+    "observed_time": {
+      "format": "date-time",
+      "title": "Observed Time",
+      "type": "string"
+    },
+    "ingested_time": {
+      "format": "date-time",
+      "title": "Ingested Time",
+      "type": "string"
+    },
+    "payload_format": {
+      "enum": [
+        "json",
+        "text",
+        "xml",
+        "csv",
+        "pcap_ref"
+      ],
+      "title": "Payload Format",
+      "type": "string"
+    },
+    "payload": {
+      "anyOf": [
+        {
+          "type": "object"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Payload"
+    },
+    "raw_ref": {
+      "title": "Raw Ref",
+      "type": "string"
+    },
+    "raw_sha256": {
+      "title": "Raw Sha256",
+      "type": "string"
+    },
+    "labels": {
+      "title": "Labels",
+      "type": "object"
+    }
+  },
+  "required": [
+    "raw_id",
+    "source",
+    "observed_time",
+    "ingested_time",
+    "payload_format",
+    "raw_ref",
+    "raw_sha256"
+  ],
+  "title": "RawEventEnvelope",
+  "type": "object"
+}

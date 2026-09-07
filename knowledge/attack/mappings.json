@@ -1,0 +1,45 @@
+{
+  "attack_version": "19.2",
+  "techniques": {
+    "T1078": {"technique_id": "T1078", "name": "Valid Accounts", "tactic_ids": ["TA0001"]},
+    "T1059.001": {"technique_id": "T1059.001", "name": "PowerShell", "tactic_ids": ["TA0002"]},
+    "T1071.001": {"technique_id": "T1071.001", "name": "Web Protocols", "tactic_ids": ["TA0011"]},
+    "T1071.004": {"technique_id": "T1071.004", "name": "DNS", "tactic_ids": ["TA0011"]},
+    "T1095": {"technique_id": "T1095", "name": "Non-Application Layer Protocol", "tactic_ids": ["TA0011"]},
+    "T1021": {"technique_id": "T1021", "name": "Remote Services", "tactic_ids": ["TA0008"]},
+    "T1068": {"technique_id": "T1068", "name": "Exploitation for Privilege Escalation", "tactic_ids": ["TA0004"]},
+    "T1005": {"technique_id": "T1005", "name": "Data from Local System", "tactic_ids": ["TA0009"]},
+    "T1041": {"technique_id": "T1041", "name": "Exfiltration Over C2 Channel", "tactic_ids": ["TA0010"]},
+    "T1055": {"technique_id": "T1055", "name": "Process Injection", "tactic_ids": ["TA0004"]},
+    "T1547.001": {"technique_id": "T1547.001", "name": "Registry Run Keys / Startup Folder", "tactic_ids": ["TA0003"]}
+  },
+  "groups": {
+    "G0022": {
+      "name": "APT3",
+      "technique_ids": ["T1078", "T1059.001", "T1021", "T1053.005", "T1105"],
+      "source": "https://attack.mitre.org/groups/G0022/"
+    }
+  },
+  "software": {
+    "S0194": {
+      "name": "PowerSploit",
+      "type": "tool",
+      "technique_ids": ["T1059.001", "T1005", "T1547.001", "T1055"],
+      "source": "https://attack.mitre.org/software/S0194/"
+    }
+  },
+  "mappings": {
+    "det.auth.remote_interactive_logon": [{"technique_id":"T1078","subtechnique_id":null,"tactic_ids":["TA0001"],"mapping_rule_id":"map.auth.remote_logon","attack_version":"19.2","confidence":0.72}],
+    "det.host.suspicious_powershell": [{"technique_id":"T1059","subtechnique_id":"T1059.001","tactic_ids":["TA0002"],"mapping_rule_id":"map.host.powershell","attack_version":"19.2","confidence":0.95}],
+    "det.network.cross_source_interpreter_connection": [{"technique_id":"T1071","subtechnique_id":"T1071.001","tactic_ids":["TA0011"],"mapping_rule_id":"map.network.interpreter_web","attack_version":"19.2","confidence":0.82}],
+    "det.network.dns_tunnel": [{"technique_id":"T1071","subtechnique_id":"T1071.004","tactic_ids":["TA0011"],"mapping_rule_id":"map.network.dns_tunnel","attack_version":"19.2","confidence":0.91}],
+    "det.network.http_covert_channel": [{"technique_id":"T1071","subtechnique_id":"T1071.001","tactic_ids":["TA0011"],"mapping_rule_id":"map.network.http_covert","attack_version":"19.2","confidence":0.9}],
+    "det.network.icmp_tunnel": [{"technique_id":"T1095","subtechnique_id":null,"tactic_ids":["TA0011"],"mapping_rule_id":"map.network.icmp_tunnel","attack_version":"19.2","confidence":0.9}],
+    "det.auth.lateral_movement": [{"technique_id":"T1021","subtechnique_id":null,"tactic_ids":["TA0008"],"mapping_rule_id":"map.auth.remote_service","attack_version":"19.2","confidence":0.88}],
+    "det.host.privilege_escalation": [{"technique_id":"T1068","subtechnique_id":null,"tactic_ids":["TA0004"],"mapping_rule_id":"map.host.privilege_change","attack_version":"19.2","confidence":0.86}],
+    "det.host.sensitive_file_collection": [{"technique_id":"T1005","subtechnique_id":null,"tactic_ids":["TA0009"],"mapping_rule_id":"map.host.sensitive_file","attack_version":"19.2","confidence":0.9}],
+    "det.network.data_exfiltration": [{"technique_id":"T1041","subtechnique_id":null,"tactic_ids":["TA0010"],"mapping_rule_id":"map.network.exfiltration","attack_version":"19.2","confidence":0.92}],
+    "det.host.memory_tampering": [{"technique_id":"T1055","subtechnique_id":null,"tactic_ids":["TA0004"],"mapping_rule_id":"map.host.memory","attack_version":"19.2","confidence":0.84}],
+    "det.host.registry_persistence": [{"technique_id":"T1547","subtechnique_id":"T1547.001","tactic_ids":["TA0003"],"mapping_rule_id":"map.host.registry_run","attack_version":"19.2","confidence":0.9}]
+  }
+}

@@ -1,0 +1,24 @@
+schema_version: "1.0"
+topology_id: course-lab-9-node
+internet_egress: denied
+networks:
+  perimeter: 10.10.10.0/24
+  user: 10.10.20.0/24
+  server: 10.10.30.0/24
+  adversary_sim: 10.10.40.0/24
+nodes:
+  - {id: attacker, role: attacker, os: kali-linux, network: adversary_sim}
+  - {id: firewall, role: firewall-router, os: opnsense, network: perimeter}
+  - {id: win-client-01, role: windows-client, os: windows-11, network: user}
+  - {id: win-server-01, role: windows-server, os: windows-server, network: server}
+  - {id: linux-client-01, role: linux-client, os: ubuntu, network: user}
+  - {id: linux-server-01, role: linux-server, os: ubuntu-server, network: server}
+  - {id: web-server-01, role: vulnerable-web, os: linux, network: perimeter}
+  - {id: c2-sim, role: controlled-c2, os: linux, network: adversary_sim}
+  - {id: analysis-node, role: analysis, os: linux, network: server}
+sensors:
+  - {id: sensor-win-endpoint-01, kind: sysmon-wazuh, nodes: [win-client-01, win-server-01]}
+  - {id: sensor-linux-endpoint-01, kind: auditd-wazuh, nodes: [linux-client-01, linux-server-01, web-server-01]}
+  - {id: sensor-zeek-boundary-01, kind: zeek, observation: perimeter}
+  - {id: sensor-zeek-internal-01, kind: zeek, observation: user-server}
+

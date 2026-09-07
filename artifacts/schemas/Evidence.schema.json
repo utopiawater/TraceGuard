@@ -1,0 +1,126 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "evidence_id": {
+      "title": "Evidence Id",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "raw_event",
+        "normalized_event",
+        "graph_fact",
+        "intel_fact",
+        "analytic"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "source_ref": {
+      "title": "Source Ref",
+      "type": "string"
+    },
+    "event_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Event Ids",
+      "type": "array"
+    },
+    "entity_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Entity Ids",
+      "type": "array"
+    },
+    "excerpt": {
+      "anyOf": [
+        {},
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Excerpt"
+    },
+    "observed_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Observed At"
+    },
+    "collected_at": {
+      "format": "date-time",
+      "title": "Collected At",
+      "type": "string"
+    },
+    "producer": {
+      "title": "Producer",
+      "type": "string"
+    },
+    "producer_version": {
+      "title": "Producer Version",
+      "type": "string"
+    },
+    "integrity_sha256": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Integrity Sha256"
+    },
+    "reliability": {
+      "enum": [
+        "direct",
+        "corroborated",
+        "derived",
+        "external_unverified"
+      ],
+      "title": "Reliability",
+      "type": "string"
+    },
+    "supports": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Supports",
+      "type": "array"
+    },
+    "contradicts": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Contradicts",
+      "type": "array"
+    }
+  },
+  "required": [
+    "evidence_id",
+    "kind",
+    "source_ref",
+    "collected_at",
+    "producer",
+    "producer_version",
+    "reliability"
+  ],
+  "title": "Evidence",
+  "type": "object"
+}

@@ -1,0 +1,28 @@
+{
+  "scenario_id": "full_multisource_attack_chain",
+  "ground_truth": {"stages": ["initial_access", "execution", "command_and_control", "lateral_movement", "privilege_escalation", "collection", "exfiltration"], "covert_channels": ["dns", "http", "icmp"]},
+  "records": [
+    {"file":"../powershell_cross_source/windows_security_4624.xml","format":"xml","source_kind":"windows_security","dataset":"windows.security","sensor_id":"win-client-01","source_record_id":"initial-4624","event_time_raw":"2026-09-07T08:00:00Z","host_hint":"win-client-01.corp.lab"},
+    {"file":"../powershell_cross_source/sysmon_1_process_create.xml","format":"xml","source_kind":"sysmon","dataset":"sysmon.operational","sensor_id":"win-client-01","source_record_id":"exec-1","event_time_raw":"2026-09-07T08:00:01Z","host_hint":"win-client-01.corp.lab"},
+    {"file":"../powershell_cross_source/sysmon_3_network_connect.xml","format":"xml","source_kind":"sysmon","dataset":"sysmon.operational","sensor_id":"win-client-01","source_record_id":"c2-3","event_time_raw":"2026-09-07T08:00:02Z","host_hint":"win-client-01.corp.lab"},
+    {"file":"../powershell_cross_source/zeek_conn.json","format":"json","source_kind":"zeek","dataset":"zeek.conn","sensor_id":"zeek-core","source_record_id":"c2-conn","event_time_raw":"2026-09-07T08:00:02.350Z","host_hint":"win-client-01.corp.lab"},
+    {"file":"dns_channels.json","format":"json","batch":true,"source_kind":"zeek","dataset":"zeek.dns","sensor_id":"zeek-core","source_record_id":"dns","event_time_raw":"2026-09-07T08:01:00Z","host_hint":"win-client-01.corp.lab"},
+    {"file":"http_channels.json","format":"json","batch":true,"source_kind":"zeek","dataset":"zeek.http","sensor_id":"zeek-core","source_record_id":"http","event_time_raw":"2026-09-07T08:01:20Z","host_hint":"win-client-01.corp.lab"},
+    {"file":"icmp_channels.json","format":"json","batch":true,"source_kind":"zeek","dataset":"zeek.icmp","sensor_id":"zeek-core","source_record_id":"icmp","event_time_raw":"2026-09-07T08:01:40Z","host_hint":"win-client-01.corp.lab"},
+    {"file":"lateral_conn.json","format":"json","source_kind":"zeek","dataset":"zeek.conn","sensor_id":"zeek-core","source_record_id":"lateral-conn","event_time_raw":"2026-09-07T08:02:00Z","host_hint":"win-client-01.corp.lab"},
+    {"file":"lateral_logon.xml","format":"xml","source_kind":"windows_security","dataset":"windows.security","sensor_id":"win-server-02","source_record_id":"lateral-4624","event_time_raw":"2026-09-07T08:02:01Z","host_hint":"10.10.30.20"},
+    {"file":"privilege_4672.xml","format":"xml","source_kind":"windows_security","dataset":"windows.security","sensor_id":"win-server-02","source_record_id":"priv-4672","event_time_raw":"2026-09-07T08:02:02Z","host_hint":"10.10.30.20"},
+    {"file":"wazuh_registry.json","format":"json","source_kind":"wazuh","dataset":"wazuh.alerts","sensor_id":"wazuh-manager","source_record_id":"wazuh-registry","event_time_raw":"2026-09-07T08:02:03Z","host_hint":"10.10.30.20"},
+    {"file":"sysmon_file_11.xml","format":"xml","source_kind":"sysmon","dataset":"sysmon.operational","sensor_id":"win-server-02","source_record_id":"file-11","event_time_raw":"2026-09-07T08:02:03.100Z","host_hint":"10.10.30.20"},
+    {"file":"windows_file_4663.xml","format":"xml","source_kind":"windows_security","dataset":"windows.security","sensor_id":"win-server-02","source_record_id":"file-4663","event_time_raw":"2026-09-07T08:02:03.200Z","host_hint":"10.10.30.20"},
+    {"file":"sysmon_file_23.xml","format":"xml","source_kind":"sysmon","dataset":"sysmon.operational","sensor_id":"win-server-02","source_record_id":"file-23","event_time_raw":"2026-09-07T08:02:03.300Z","host_hint":"10.10.30.20"},
+    {"file":"sysmon_process_5.xml","format":"xml","source_kind":"sysmon","dataset":"sysmon.operational","sensor_id":"win-client-01","source_record_id":"process-5","event_time_raw":"2026-09-07T08:02:03.400Z","host_hint":"win-client-01.corp.lab"},
+    {"file":"sysmon_memory_8.xml","format":"xml","source_kind":"sysmon","dataset":"sysmon.operational","sensor_id":"win-server-02","source_record_id":"memory-8","event_time_raw":"2026-09-07T08:02:03.500Z","host_hint":"10.10.30.20"},
+    {"file":"sysmon_memory_10.xml","format":"xml","source_kind":"sysmon","dataset":"sysmon.operational","sensor_id":"win-server-02","source_record_id":"memory-10","event_time_raw":"2026-09-07T08:02:03.600Z","host_hint":"10.10.30.20"},
+    {"file":"sysmon_memory_25.xml","format":"xml","source_kind":"sysmon","dataset":"sysmon.operational","sensor_id":"win-server-02","source_record_id":"memory-25","event_time_raw":"2026-09-07T08:02:04Z","host_hint":"10.10.30.20"},
+    {"file":"auditd_compound.log","format":"text","source_kind":"auditd","dataset":"audit.log","sensor_id":"linux-audit-02","source_record_id":"audit-compound","event_time_raw":"2026-09-07T08:02:05Z","host_hint":"10.10.30.20"},
+    {"file":"exfil_files.json","format":"json","source_kind":"zeek","dataset":"zeek.files","sensor_id":"zeek-core","source_record_id":"exfil-files","event_time_raw":"2026-09-07T08:03:00Z","host_hint":"10.10.30.20"},
+    {"file":"zeek_weird.json","format":"json","source_kind":"zeek","dataset":"zeek.weird","sensor_id":"zeek-core","source_record_id":"weird-01","event_time_raw":"2026-09-07T08:03:01Z","host_hint":"10.10.30.20"},
+    {"file":"zeek_notice.json","format":"json","source_kind":"zeek","dataset":"zeek.notice","sensor_id":"zeek-core","source_record_id":"notice-01","event_time_raw":"2026-09-07T08:03:02Z","host_hint":"10.10.30.20"}
+  ]
+}
