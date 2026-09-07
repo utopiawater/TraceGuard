@@ -18,7 +18,7 @@ def _task_view(record: dict) -> dict:
     status = result.get("status") if result else task["state"]
     return {
         **task, "status": status, "started_at": runtime.get("started_at"), "finished_at": runtime.get("finished_at"),
-        "created_at": runtime.get("created_at"),
+        "created_at": runtime.get("created_at"), "status_history": runtime.get("status_history", []),
         "chain_id": runtime.get("chain_id"), "investigation_id": runtime.get("investigation_id"),
         "model_fallback": runtime.get("model_fallback", False), "error": runtime.get("error"),
         "result": result, "artifact": result_wrapper.get("artifact", {}),

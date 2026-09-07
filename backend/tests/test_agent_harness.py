@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from app.agents.harness import EvidenceValidator, Orchestrator, Tool, ToolGateway, default_agent_registry
 from app.agents.service import InvestigationService
+from app.agents.model import OpenAICompatibleModelClient
 from app.agents.tools import build_tool_gateway
 from app.bootstrap import build_pipeline
 from app.contracts import AgentResult, AgentTask
@@ -92,6 +93,23 @@ def test_agent_result_json_schema_is_enforced():
         AgentResult.model_validate(invalid)
 
 
+def test_model_client_retries_one_invalid_json_response(monkeypatch):
+    calls = []
+    class Response:
+        def raise_for_status(self):
+            return None
+        def json(self):
+            content = "not-json" if len(calls) == 1 else "{}"
+            return {"choices": [{"message": {"content": content}}]}
+    def fake_post(*args, **kwargs):
+        calls.append(kwargs["json"])
+        return Response()
+    monkeypatch.setattr("app.agents.model.httpx.post", fake_post)
+    client = OpenAICompatibleModelClient("https://model.example/v1", "secret", "fake-model")
+    assert client.complete_json("host", "1.0.0", {}, {"type": "object"}) == {}
+    assert len(calls) == 2
+
+
 class EchoDraftModel:
     configured = True
     def complete_json(self, role, prompt_version, payload, schema):
@@ -114,10 +132,13 @@ def test_coordinator_runs_parallel_specialists_and_persists_full_flow(tmp_path):
     assert {item["task"]["agent_role"] for item in records} == {"coordinator", "host", "network", "correlation", "attribution", "report"}
     assert all(item["result"]["result"]["findings"] for item in records)
     assert all(finding["evidence_ids"] for item in records for finding in item["result"]["result"]["findings"])
+    assert all([state["status"] for state in item["runtime"]["status_history"]] == ["queued", "running", "succeeded"] for item in records)
     by_role = {item["task"]["agent_role"]: item for item in records}
     assert {call["tool"] for call in by_role["host"]["result"]["result"]["tool_calls"]} >= {"event_search", "entity_timeline", "detection_lookup", "evidence_get"}
     assert {call["tool"] for call in by_role["network"]["result"]["result"]["tool_calls"]} >= {"event_search", "session_lookup", "detection_lookup", "evidence_get"}
     assert by_role["correlation"]["result"]["artifact"]["chain_valid"] is True
+    assert by_role["attribution"]["result"]["artifact"]["status"] == "unable_to_attribute"
+    assert by_role["attribution"]["result"]["artifact"]["candidates"][0]["candidate"] == "APT3 (G0022)"
     assert len(repo.list_reports()) == 2
 
 
