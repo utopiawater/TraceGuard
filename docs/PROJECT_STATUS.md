@@ -39,7 +39,7 @@ Collector / Replay / DARPA Dataset
 - AttackChain 仍由 `DeterministicChainBuilder` 基于 Detection 和 ATT&CK tactic 生成，不读取 Ground Truth。
 - Multi-Agent 保持六角色：Coordinator、Host、Network、Correlation、Attribution、Report。Quick scope 使用 Coordinator、Host、Network、Correlation；真实 LLM 不可用时明确记录 deterministic fallback。
 - Frontend 13 个页面接真实 API，不用业务 mock 伪造结果。
-- `/api/datasets` 和 Dataset 页面已读取真实 DARPA run report。
+- `/api/datasets` 和 Dataset 页面已读取真实 DARPA run report；Dataset 页面会展示 IOC coverage、未覆盖 IOC 构成、低语义系统调用占比和指标限制说明。
 
 ## 3. DARPA TC E3 CADets 接入状态
 
@@ -82,6 +82,7 @@ py -3.13 scripts/replay_dataset.py --dataset datasets/darpa_tc_e3_cadets --data-
 - technique_ids: `T1005`, `T1046`, `T1055`, `T1059`, `T1068`, `T1071.001`
 - chain_count: 1
 - IOC coverage: 99 / 776
+- uncovered IOC analysis: 677 个未覆盖 IOC 中 651 个为 network IOC，648 个为低语义系统调用；主要由 `recvfrom`、`sendto` 和少量文件落地/权限/删除事件组成。
 - Evidence backtrace rate: 1.0
 
 当前 Dataset AttackChain 由系统 Detection 生成，关键步骤为：
@@ -155,5 +156,5 @@ py -3.13 scripts/replay_dataset.py --dataset datasets/darpa_tc_e3_cadets --data-
 
 - Date: 2026-09-09
 - Branch: `main`
-- HEAD at earlier inspection: `9c2fb1e1533ea0eb2902efc4e84b68f42578ad98`
-- Working tree: dirty，包含本次 DARPA 接入、文档更新、测试 fixture、运行报告和既有 `.pytest-*` 权限受限临时目录状态。
+- HEAD at latest committed DARPA integration: `97e66f4`
+- Working tree note: 正常源码改动应只来自当前任务；仍可能显示既有 `.pytest-*` / `.tmp-*` 权限受限临时目录状态，提交时需显式白名单 staging。

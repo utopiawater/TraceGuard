@@ -26,6 +26,18 @@ interface DatasetRun {
   technique_count: number
   chain_count: number
   ioc_coverage?: { covered: number; total: number; rate: number | null }
+  ioc_coverage_analysis?: {
+    uncovered_ioc_events: number
+    action_distribution?: Record<string, number>
+    event_type_distribution?: Record<string, number>
+    process_distribution?: Record<string, number>
+    network_ioc_events?: number
+    file_ioc_events?: number
+    low_semantic_syscall_events?: number
+    low_semantic_rate?: number | null
+    assessment?: string
+    potential_detection_gaps?: string[]
+  }
   stage_coverage?: { covered: number; total: number; rate: number | null; stages: string[] }
   evidence_backtrace_rate: number
   runtime_seconds: number
@@ -86,9 +98,51 @@ export const DatasetsPage=()=> {
           <p>{run.f1_reason}</p>
         </article>
       </div>
+      {run.ioc_coverage_analysis && <IocCoverageAnalysis analysis={run.ioc_coverage_analysis} />}
       {!!run.limitations?.length && <p className="dataset-note">{run.limitations.join(' ')}</p>}
     </section>}
   </>
+}
+
+function IocCoverageAnalysis({analysis}:{analysis:NonNullable<DatasetRun['ioc_coverage_analysis']>}) {
+  const rows = [
+    ['未覆盖 IOC', analysis.uncovered_ioc_events],
+    ['网络 IOC', analysis.network_ioc_events],
+    ['文件 IOC', analysis.file_ioc_events],
+    ['低语义系统调用', analysis.low_semantic_syscall_events],
+    ['低语义占比', pct(analysis.low_semantic_rate)],
+  ]
+  return <section className="ioc-analysis">
+    <header>
+      <div>
+        <h2>IOC 覆盖解释</h2>
+        <p>{analysis.assessment ?? '未覆盖 IOC 只用于 Evaluation 对照，不会反向影响 Detection。'}</p>
+      </div>
+    </header>
+    <div className="ioc-summary">{rows.map(([label,value]) => value != null && <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>
+    <div className="ioc-breakdown">
+      <Distribution title="主要 action" values={analysis.action_distribution} />
+      <Distribution title="主要 event_type" values={analysis.event_type_distribution} />
+      <Distribution title="主要进程" values={analysis.process_distribution} />
+    </div>
+    {!!analysis.potential_detection_gaps?.length && <p className="dataset-note">{analysis.potential_detection_gaps.join(' ')}</p>}
+  </section>
+}
+
+function Distribution({title, values}:{title:string; values?:Record<string, number>}) {
+  const entries = Object.entries(values ?? {}).sort((a,b)=>b[1]-a[1]).slice(0, 5)
+  if (!entries.length) return null
+  const max = Math.max(...entries.map(([,count]) => count))
+  return <article>
+    <h3>{title}</h3>
+    <div className="distribution-list">
+      {entries.map(([label,count]) => <div key={label}>
+        <span>{label}</span>
+        <meter min={0} max={max} value={count} aria-label={`${title} ${label}`} />
+        <strong>{count}</strong>
+      </div>)}
+    </div>
+  </article>
 }
 
 function Metric({label,value}:{label:string;value:string|number}) {

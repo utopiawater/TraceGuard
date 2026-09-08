@@ -21,6 +21,7 @@ Dataset Adapter ─┘
 - detection_count: 348
 - chain_count: 1
 - report: `data/dataset_e3/dataset_run_report.json`
+- frontend: `/datasets` 页面读取 `/api/datasets` 的真实报告，展示 IOC 覆盖、未覆盖 IOC 构成和二分类指标 N/A 原因。
 - Precision / Recall / F1: N/A，因为该切片不具备完备逐事件 benign/attack 二分类真值。
 
 ## 2. 候选数据集
@@ -194,7 +195,7 @@ GroundTruthRecord:
 - 性能；
 - 限制与不可比较项。
 
-前端只显示事实指标，不用单一“准确率”掩盖类别不平衡。
+前端只显示事实指标，不用单一“准确率”掩盖类别不平衡。当前 Dataset 页面额外展示未覆盖 IOC 的 action、event_type 和 process Top 分布，用于解释 coverage 缺口，不作为 Detection 反向输入。
 
 ## 11. P0 和降级
 
