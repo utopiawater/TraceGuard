@@ -14,6 +14,7 @@ class GraphProjectionBatch(ContractModel):
 
 class EntityResolver:
     version = "1.0.0"
+    max_entity_evidence = 200
 
     def resolve(
         self,
@@ -29,7 +30,7 @@ class EntityResolver:
             if ref is None:
                 return
             previous = entities.get(ref.entity_id)
-            evidence_ids = sorted(set((previous.evidence_ids if previous else []) + [event_evidence[event.event_id]]))
+            evidence_ids = sorted(set((previous.evidence_ids if previous else []) + [event_evidence[event.event_id]]))[:self.max_entity_evidence]
             entities[ref.entity_id] = GraphEntity(
                 entity_id=ref.entity_id,
                 entity_type=ref.entity_type,

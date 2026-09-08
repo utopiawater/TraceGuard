@@ -2,6 +2,7 @@
   "attack_version": "19.2",
   "techniques": {
     "T1078": {"technique_id": "T1078", "name": "Valid Accounts", "tactic_ids": ["TA0001"]},
+    "T1059": {"technique_id": "T1059", "name": "Command and Scripting Interpreter", "tactic_ids": ["TA0002"]},
     "T1059.001": {"technique_id": "T1059.001", "name": "PowerShell", "tactic_ids": ["TA0002"]},
     "T1071.001": {"technique_id": "T1071.001", "name": "Web Protocols", "tactic_ids": ["TA0011"]},
     "T1071.004": {"technique_id": "T1071.004", "name": "DNS", "tactic_ids": ["TA0011"]},
@@ -11,7 +12,8 @@
     "T1005": {"technique_id": "T1005", "name": "Data from Local System", "tactic_ids": ["TA0009"]},
     "T1041": {"technique_id": "T1041", "name": "Exfiltration Over C2 Channel", "tactic_ids": ["TA0010"]},
     "T1055": {"technique_id": "T1055", "name": "Process Injection", "tactic_ids": ["TA0004"]},
-    "T1547.001": {"technique_id": "T1547.001", "name": "Registry Run Keys / Startup Folder", "tactic_ids": ["TA0003"]}
+    "T1547.001": {"technique_id": "T1547.001", "name": "Registry Run Keys / Startup Folder", "tactic_ids": ["TA0003"]},
+    "T1046": {"technique_id": "T1046", "name": "Network Service Scanning", "tactic_ids": ["TA0007"]}
   },
   "groups": {
     "G0022": {
@@ -100,6 +102,9 @@
     "det.host.sensitive_file_collection": [{"technique_id":"T1005","subtechnique_id":null,"tactic_ids":["TA0009"],"mapping_rule_id":"map.host.sensitive_file","attack_version":"19.2","confidence":0.9}],
     "det.network.data_exfiltration": [{"technique_id":"T1041","subtechnique_id":null,"tactic_ids":["TA0010"],"mapping_rule_id":"map.network.exfiltration","attack_version":"19.2","confidence":0.92}],
     "det.host.memory_tampering": [{"technique_id":"T1055","subtechnique_id":null,"tactic_ids":["TA0004"],"mapping_rule_id":"map.host.memory","attack_version":"19.2","confidence":0.84}],
-    "det.host.registry_persistence": [{"technique_id":"T1547","subtechnique_id":"T1547.001","tactic_ids":["TA0003"],"mapping_rule_id":"map.host.registry_run","attack_version":"19.2","confidence":0.9}]
+    "det.host.registry_persistence": [{"technique_id":"T1547","subtechnique_id":"T1547.001","tactic_ids":["TA0003"],"mapping_rule_id":"map.host.registry_run","attack_version":"19.2","confidence":0.9}],
+    "det.host.temp_directory_execution": [{"technique_id":"T1059","subtechnique_id":null,"tactic_ids":["TA0002"],"mapping_rule_id":"map.host.temp_exec","attack_version":"19.2","confidence":0.74}],
+    "det.network.service_process_external_connection": [{"technique_id":"T1071","subtechnique_id":"T1071.001","tactic_ids":["TA0011"],"mapping_rule_id":"map.network.service_external","attack_version":"19.2","confidence":0.72}],
+    "det.network.service_scanning": [{"technique_id":"T1046","subtechnique_id":null,"tactic_ids":["TA0007"],"mapping_rule_id":"map.network.service_scanning","attack_version":"19.2","confidence":0.82}]
   }
 }

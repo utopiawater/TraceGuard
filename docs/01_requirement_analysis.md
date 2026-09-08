@@ -14,6 +14,21 @@
 
 注意：官方“监控所有系统调用”在真实环境中会产生显著性能与存储压力。设计上保留全量采集能力，默认演示策略采用按架构、主机角色和攻击面选取的 syscall 规则集，并在报告中明确覆盖范围与丢失率，不能把“选择性策略”描述成“无条件全量”。
 
+## 2.1 当前验收状态
+
+截至 2026-09-09，TraceGuard 主系统侧已经完成：
+
+- Windows Security、Sysmon、Auditd、Wazuh、Zeek 多源日志到统一主管道。
+- 统一事件、实体、session、Evidence、Detection、ATT&CK、AttackChain、Report 和前端展示。
+- 六角色 Multi-Agent Harness 与 EvidenceValidator；真实模型验收 artifact 已归档，普通测试使用 Fake/Echo/Failing model。
+- DARPA TC E3 CADets 公开数据集正式接入，20,776 条事件通过 RawEventEnvelope -> UnifiedSecurityEvent -> Detection -> ATT&CK -> AttackChain -> Agent quick investigation -> Dataset 页面。
+- 当前后端 `pytest`、`self_check`、前端 test/build 已在 Python 3.13 环境通过。
+
+仍需团队协作补齐：
+
+- 云平台真实 8+ 节点靶场的部署截图、传感器健康截图、攻击场景录像、Ground Truth manifest 和可 replay 日志 bundle。
+- 将云靶场 bundle 接入 TraceGuard 后生成对应 run report，并在最终课程报告/PPT 中与 DARPA 数据集结果分开展示。
+
 ## 3. 需求追踪矩阵
 
 | ID | 官方要求 | 系统能力 | 后端实现 | 数据来源 | 前端展示 | 测试方式 | 优先级 |

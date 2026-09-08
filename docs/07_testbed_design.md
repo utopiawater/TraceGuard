@@ -2,7 +2,7 @@
 
 ## 1. 结论
 
-建议搭建 9 个逻辑节点：官方规定的 8 类节点全部独立登记，再增加 1 个分析中心。通过 5 台 VM + 容器服务 + 虚拟交换实现，不要求 9 台高配置 VM。所有攻击、扫描、后门和 C2 软件仅在 Host-only/Internal 虚拟网络运行，默认无公网路由；情报数据提前冻结。
+建议搭建 9 个逻辑节点：官方规定的 8 类节点全部独立登记，再增加 1 个分析中心。当前真实靶场由团队同学在云平台搭建，本仓库负责拓扑设计、日志 bundle 接入契约和 TraceGuard 分析验证。所有攻击、扫描、后门和 C2 软件仅在隔离云网络运行，默认无公网攻击目标；情报数据提前冻结。
 
 ## 2. 拓扑
 
@@ -140,6 +140,8 @@ Runner 记录实际 start/end、退出状态和 artifact hash。Ground Truth 与
 - 所有 AttackChain step 可下钻 raw evidence；
 - 场景可回滚，二次运行结果 ID 不冲突；
 - 截图/录像记录节点清单、传感器健康、链图和证据。
+
+云平台交接时还必须提供 `docs/13_cloud_testbed_handoff.md` 中定义的 `manifest.yaml`、日志 bundle、checksums、截图和录像。TraceGuard 侧只接收可复现日志与 Ground Truth manifest，不把 Ground Truth 直接转成系统 Detection 或 AttackChain。
 
 ## 9. 演示压缩方案
 

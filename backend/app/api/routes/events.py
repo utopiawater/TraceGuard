@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import Optional
 
 from app.api.dependencies import repository
 from app.api.envelope import response
@@ -8,18 +9,18 @@ router = APIRouter(tags=["events"])
 
 
 @router.get("/events")
-def events(limit: int = Query(default=100, ge=1, le=500), repo: SQLiteRepository = Depends(repository)) -> dict:
-    return response([item.model_dump(mode="json") for item in repo.list_events(limit)])
+def events(limit: int = Query(default=100, ge=1, le=500), run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository)) -> dict:
+    return response([item.model_dump(mode="json") for item in repo.list_events(limit, run_id=run_id)])
 
 
 @router.get("/sessions")
-def sessions(limit: int = Query(default=100, ge=1, le=500), repo: SQLiteRepository = Depends(repository)) -> dict:
-    return response([item.model_dump(mode="json") for item in repo.list_sessions(limit)])
+def sessions(limit: int = Query(default=100, ge=1, le=500), run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository)) -> dict:
+    return response([item.model_dump(mode="json") for item in repo.list_sessions(limit, run_id=run_id)])
 
 
 @router.get("/evidence")
-def evidence(limit: int = Query(default=100, ge=1, le=500), repo: SQLiteRepository = Depends(repository)) -> dict:
-    return response([item.model_dump(mode="json") for item in repo.list_evidence(limit)])
+def evidence(limit: int = Query(default=100, ge=1, le=500), run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository)) -> dict:
+    return response([item.model_dump(mode="json") for item in repo.list_evidence(limit, run_id=run_id)])
 
 
 @router.get("/evidence/{evidence_id}")

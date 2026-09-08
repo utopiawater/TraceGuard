@@ -1,5 +1,6 @@
 import html
 import json
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Literal, Optional, Set, Tuple
@@ -65,7 +66,7 @@ class InvestigationService:
 
         correlation = self._new_task(case_id, "correlation", "审阅既有七阶段攻击链、关系路径、替代解释与证据缺口", [chain_id, host_result.result_id, network_result.result_id], coordinator.task_id, max_steps)
         self._queue(correlation, chain_id, created, scope)
-        correlation_result, correlation_artifact = self._guarded(correlation, chain, self._run_correlation, host_result, network_result)
+        correlation_result, correlation_artifact = self._guarded(correlation, chain, self._run_correlation, host_result, network_result, quick)
 
         if quick:
             return self._summary(
@@ -152,7 +153,7 @@ class InvestigationService:
         return self.gateway.invoke(task, self.registry, name, arguments)
 
     def _finish(self, task: AgentTask, chain: AttackChain, draft: AgentResult, context: dict, artifact: Optional[dict] = None) -> AgentResult:
-        evidence_ids = {item.evidence_id for item in self.repo.list_evidence(10000)}
+        evidence_ids = set(self.repo.evidence_ids_for_run(chain.run_id))
         used_fallback, fallback_message, token_usage = False, None, {}
         try:
             payload = self.model.complete_json(
@@ -202,8 +203,8 @@ class InvestigationService:
     def _run_coordinator(self, task: AgentTask, chain: AttackChain, quick: bool = False) -> Tuple[AgentResult, dict]:
         running, _ = self._start(task, chain.chain_id)
         chain_data = self._invoke(running, "chain_lookup", {"chain_id": chain.chain_id})
-        source_data = self._invoke(running, "source_health", {"limit": 50})
-        detection_data = self._invoke(running, "detection_lookup", {"ids": chain.detection_ids[:50]}) if not quick else {"detections": []}
+        source_data = self._invoke(running, "source_health", {"run_id": chain.run_id, "limit": 50})
+        detection_data = self._invoke(running, "detection_lookup", {"run_id": chain.run_id, "ids": chain.detection_ids[:50]}) if not quick else {"detections": []}
         evidence = chain.evidence_ids[:50]
         findings = [AgentFinding(
             claim="已锁定既有攻击链并创建主机与网络并行调查分支；后续关联只审阅原有 %d 个步骤。" % len(chain.steps),
@@ -215,16 +216,16 @@ class InvestigationService:
 
     def _run_host(self, task: AgentTask, chain: AttackChain, quick: bool = False) -> Tuple[AgentResult, dict]:
         running, _ = self._start(task, chain.chain_id)
-        detections = [item for item in self.repo.list_detections(5000) if item.run_id == chain.run_id and item.rule_id.startswith(HOST_RULE_PREFIXES)]
-        detection_data = self._invoke(running, "detection_lookup", {"ids": [item.detection_id for item in detections]}) if detections else {"detections": []}
+        detections = [item for item in self.repo.list_detections(50000, run_id=chain.run_id) if item.rule_id.startswith(HOST_RULE_PREFIXES)]
+        detection_data = self._invoke(running, "detection_lookup", {"run_id": chain.run_id, "ids": [item.detection_id for item in detections[:50]]}) if detections else {"detections": []}
         actions = ["auth.", "process.", "file.", "registry.", "privilege.", "memory."]
-        event_data = self._invoke(running, "event_search", {"actions": actions, "limit": 60 if quick else 200})
-        session_data = {"sessions": [], "count": 0} if quick else self._invoke(running, "session_lookup", {"session_type": "login", "limit": 100})
-        timeline_data = {"events": []} if quick else (self._invoke(running, "entity_timeline", {"entity_id": chain.entity_ids[0], "limit": 100}) if chain.entity_ids else {"events": []})
-        graph_data = {"nodes": [], "edges": []} if quick else (self._invoke(running, "graph_neighbors", {"entity_id": chain.entity_ids[0], "depth": 2, "limit": 100}) if chain.entity_ids else {"nodes": [], "edges": []})
+        event_data = self._invoke(running, "event_search", {"run_id": chain.run_id, "actions": actions, "limit": 60 if quick else 200})
+        session_data = {"sessions": [], "count": 0} if quick else self._invoke(running, "session_lookup", {"run_id": chain.run_id, "session_type": "login", "limit": 100})
+        timeline_data = {"events": []} if quick else (self._invoke(running, "entity_timeline", {"run_id": chain.run_id, "entity_id": chain.entity_ids[0], "limit": 100}) if chain.entity_ids else {"events": []})
+        graph_data = {"nodes": [], "edges": []} if quick else (self._invoke(running, "graph_neighbors", {"run_id": chain.run_id, "entity_id": chain.entity_ids[0], "depth": 2, "limit": 100}) if chain.entity_ids else {"nodes": [], "edges": []})
         evidence_ids = sorted({evidence for item in detections for evidence in item.evidence_ids})
-        evidence_data = self._invoke(running, "evidence_get", {"ids": evidence_ids[:50]}) if evidence_ids else {"evidence": []}
-        findings = [self._detection_finding(item) for item in detections]
+        evidence_data = self._invoke(running, "evidence_get", {"run_id": chain.run_id, "ids": evidence_ids[:50]}) if evidence_ids else {"evidence": []}
+        findings = self._aggregate_detection_findings(detections) if quick else [self._detection_finding(item) for item in detections]
         draft = self._draft(running, findings, [item.detection_id for item in detections], "succeeded" if findings else "partial")
         artifact = {"domains": ["login", "user", "process", "file", "registry", "privilege", "memory"], "event_count": event_data["count"], "session_count": session_data["count"]}
         result = self._finish(running, chain, draft, {"detections": detection_data, "events": event_data, "sessions": session_data, "timeline": timeline_data, "graph": graph_data, "evidence": evidence_data}, artifact)
@@ -232,27 +233,27 @@ class InvestigationService:
 
     def _run_network(self, task: AgentTask, chain: AttackChain, quick: bool = False) -> Tuple[AgentResult, dict]:
         running, _ = self._start(task, chain.chain_id)
-        detections = [item for item in self.repo.list_detections(5000) if item.run_id == chain.run_id and item.rule_id.startswith(NETWORK_RULE_PREFIXES)]
-        detection_data = self._invoke(running, "detection_lookup", {"ids": [item.detection_id for item in detections]}) if detections else {"detections": []}
-        event_data = self._invoke(running, "event_search", {"actions": ["network.", "dns.", "http.", "icmp."], "source_kinds": ["zeek"], "limit": 60 if quick else 200})
-        session_data = {"sessions": [], "count": 0} if quick else self._invoke(running, "session_lookup", {"session_type": "network", "limit": 100})
-        graph_data = {"nodes": [], "edges": []} if quick else (self._invoke(running, "graph_neighbors", {"entity_id": chain.entity_ids[-1], "depth": 2, "limit": 100}) if chain.entity_ids else {"nodes": [], "edges": []})
+        detections = [item for item in self.repo.list_detections(50000, run_id=chain.run_id) if item.rule_id.startswith(NETWORK_RULE_PREFIXES)]
+        detection_data = self._invoke(running, "detection_lookup", {"run_id": chain.run_id, "ids": [item.detection_id for item in detections[:50]]}) if detections else {"detections": []}
+        event_data = self._invoke(running, "event_search", {"run_id": chain.run_id, "actions": ["network.", "dns.", "http.", "icmp."], "source_kinds": ["zeek", "dataset"], "limit": 60 if quick else 200})
+        session_data = {"sessions": [], "count": 0} if quick else self._invoke(running, "session_lookup", {"run_id": chain.run_id, "session_type": "network", "limit": 100})
+        graph_data = {"nodes": [], "edges": []} if quick else (self._invoke(running, "graph_neighbors", {"run_id": chain.run_id, "entity_id": chain.entity_ids[-1], "depth": 2, "limit": 100}) if chain.entity_ids else {"nodes": [], "edges": []})
         evidence_ids = sorted({evidence for item in detections for evidence in item.evidence_ids})
-        evidence_data = self._invoke(running, "evidence_get", {"ids": evidence_ids[:50]}) if evidence_ids else {"evidence": []}
-        findings = [self._detection_finding(item) for item in detections]
+        evidence_data = self._invoke(running, "evidence_get", {"run_id": chain.run_id, "ids": evidence_ids[:50]}) if evidence_ids else {"evidence": []}
+        findings = self._aggregate_detection_findings(detections) if quick else [self._detection_finding(item) for item in detections]
         draft = self._draft(running, findings, [item.detection_id for item in detections], "succeeded" if findings else "partial")
         covert = [item.rule_id for item in detections if "tunnel" in item.rule_id or "covert" in item.rule_id]
         artifact = {"domains": ["conn", "dns", "http", "icmp", "c2", "covert_channel"], "event_count": event_data["count"], "session_count": session_data["count"], "covert_detections": covert}
         result = self._finish(running, chain, draft, {"detections": detection_data, "events": event_data, "sessions": session_data, "graph": graph_data, "evidence": evidence_data}, artifact)
         return result, artifact
 
-    def _run_correlation(self, task: AgentTask, chain: AttackChain, host: AgentResult, network: AgentResult) -> Tuple[AgentResult, dict]:
+    def _run_correlation(self, task: AgentTask, chain: AttackChain, host: AgentResult, network: AgentResult, quick: bool = False) -> Tuple[AgentResult, dict]:
         running, _ = self._start(task, chain.chain_id)
         chain_data = self._invoke(running, "chain_lookup", {"chain_id": chain.chain_id})
         validation = self._invoke(running, "chain_validate", {"chain_id": chain.chain_id})
         path = {"found": False, "relations": []}
-        if len(chain.entity_ids) >= 2:
-            path = self._invoke(running, "graph_path", {"source_entity_id": chain.entity_ids[0], "target_entity_id": chain.entity_ids[-1], "max_depth": 6})
+        if not quick and len(chain.entity_ids) >= 2:
+            path = self._invoke(running, "graph_path", {"run_id": chain.run_id, "source_entity_id": chain.entity_ids[0], "target_entity_id": chain.entity_ids[-1], "max_depth": 6, "max_edges": 3000})
         findings = [AgentFinding(
             claim="链步骤“%s”保持为确定性主管道生成结果；Agent 仅验证其时间、检测、实体、证据和前驱引用。" % step.stage,
             confidence=step.score, evidence_ids=step.evidence_ids,
@@ -268,7 +269,7 @@ class InvestigationService:
         running, _ = self._start(task, chain.chain_id)
         chain_data = self._invoke(running, "chain_lookup", {"chain_id": chain.chain_id})
         attack_data = self._invoke(running, "attack_lookup", {"technique_ids": chain.technique_ids[:20]})
-        evidence_data = self._invoke(running, "evidence_get", {"ids": chain.evidence_ids[:50]})
+        evidence_data = self._invoke(running, "evidence_get", {"run_id": chain.run_id, "ids": chain.evidence_ids[:50]})
         fingerprint = AttackFingerprint.from_chain(chain, self.repo)
         c2_profiles = analyze_c2(fingerprint)
         candidate_rows = rank_groups(fingerprint, c2_profiles, attack_data.get("groups", []))
@@ -302,7 +303,7 @@ class InvestigationService:
         chain_data = self._invoke(running, "chain_lookup", {"chain_id": chain.chain_id})
         accepted_findings = [finding for result in accepted if result.status != "failed" for finding in result.findings]
         evidence_ids = sorted({item for finding in accepted_findings for item in finding.evidence_ids})
-        evidence_data = self._invoke(running, "evidence_get", {"ids": evidence_ids[:50]})
+        evidence_data = self._invoke(running, "evidence_get", {"run_id": chain.run_id, "ids": evidence_ids[:50]})
         sections = self._report_sections(chain, accepted, attribution)
         report_ids = self._persist_reports(task.case_id, chain, sections, evidence_ids)
         finding = AgentFinding(claim="调查报告已由通过 EvidenceValidator 的 Findings 生成，未重新调查或新增攻击链步骤。", confidence=chain.score, evidence_ids=evidence_ids, alternatives=list(chain.uncertainties[:3]))
@@ -317,6 +318,31 @@ class InvestigationService:
         if detection.confidence < 0.9:
             alternatives.append("该行为也可能由经过授权的管理或测试活动产生")
         return AgentFinding(claim="%s：%s" % (detection.title, detection.reason), confidence=detection.confidence, evidence_ids=detection.evidence_ids, alternatives=alternatives)
+
+    @classmethod
+    def _aggregate_detection_findings(cls, detections: List[DetectionResult], evidence_budget: int = 50) -> List[AgentFinding]:
+        grouped: Dict[str, List[DetectionResult]] = defaultdict(list)
+        for detection in detections:
+            grouped[detection.rule_id].append(detection)
+        findings = []
+        for rule_id, items in sorted(grouped.items()):
+            items.sort(key=lambda item: (item.created_at, item.detection_id))
+            sample = items[0]
+            evidence_ids = sorted({evidence_id for item in items for evidence_id in item.evidence_ids})[:evidence_budget]
+            techniques = sorted({mapping.subtechnique_id or mapping.technique_id for item in items for mapping in item.attack_mappings})
+            confidence = round(sum(item.confidence for item in items) / len(items), 4)
+            alternatives = ["该聚合 Finding 覆盖 %d 条同类检测；完整 Evidence 可通过 detection_ids 下钻。" % len(items)]
+            if confidence < 0.9:
+                alternatives.append("同类行为也可能由经过授权的管理或测试活动产生")
+            findings.append(AgentFinding(
+                claim="%s：%d 条同类检测，规则 %s，Technique %s。代表性原因：%s" % (
+                    sample.title, len(items), rule_id, ", ".join(techniques) if techniques else "N/A", sample.reason,
+                ),
+                confidence=confidence,
+                evidence_ids=evidence_ids,
+                alternatives=alternatives,
+            ))
+        return findings
 
     @staticmethod
     def _accepted(result: AgentResult) -> List[dict]:

@@ -52,8 +52,27 @@ The immutable release evidence for the successful DeepSeek run is:
 
 Automated tests use a Fake ModelClient and do not consume real LLM tokens.
 
+## Public dataset replay
+
+DARPA TC E3 CADets is the current public dataset acceptance run. It must be replayed through the TraceGuard pipeline, not through a separate analysis script:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/replay_dataset.py --dataset datasets/darpa_tc_e3_cadets --data-dir data/dataset_e3 --run-id run_darpa_tc_e3_001 --reset --quick-investigation --agent-fallback
+```
+
+Expected current summary:
+
+- `input_records`: 20776
+- `normalized_records`: 20776
+- `failed_records`: 0
+- `detection_count`: 348
+- `chain_count`: 1
+- report: `data/dataset_e3/dataset_run_report.json`
+
+Ground Truth, official IOC, `attack_graph.json`, `attack_timeline.json`, and `agent_input.json` are evaluation-only and must not be used to create system Detection, ATT&CK mappings, AttackChain steps, or Agent findings.
+
 ## Incoming testbed data
 
 Wazuh JSON, Sysmon XML, Auditd compound records, and Zeek JSON can enter the existing Adapter registry and unified pipeline without changing Contracts, SQLite schema, graph model, Detection engine, AttackChain, or Agent architecture. Ground Truth remains evaluation metadata and must not be silently converted into observed evidence.
 
-Public dataset ingestion remains pending until dataset slices and labels are supplied. Keep its UI and API in an explicit empty state until real input exists.
+The physical or cloud 8+ node testbed is owned by the testbed teammates. TraceGuard expects a replay bundle plus a scenario manifest. Keep node deployment screenshots, sensor health screenshots, exported logs, and rollback evidence with the final submission. See `docs/13_cloud_testbed_handoff.md`.

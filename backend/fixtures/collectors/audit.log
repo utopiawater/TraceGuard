@@ -1,0 +1,8 @@
+type=SYSCALL msg=audit(1725681600.100:100): arch=c000003e syscall=59 success=yes exit=0 pid=1234 ppid=1 uid=1000 euid=1000 comm="bash" exe="/usr/bin/bash" ses=1
+type=EXECVE msg=audit(1725681600.100:100): argc=2 a0="bash" a1="-c"
+type=PROCTITLE msg=audit(1725681600.100:100): proctitle=62617368202d63
+type=SYSCALL msg=audit(1725681601.200:101): arch=c000003e syscall=257 success=yes exit=3 pid=1234 ppid=1 uid=1000 euid=1000 comm="bash" exe="/usr/bin/bash" ses=1
+type=CWD msg=audit(1725681601.200:101): cwd="/home/alice"
+type=PATH msg=audit(1725681601.200:101): item=0 name="/etc/passwd" inode=42 dev=08:01 mode=0100644 nametype=NORMAL
+type=SYSCALL msg=audit(1725681602.300:102): arch=c000003e syscall=42 success=yes exit=0 pid=1234 ppid=1 uid=1000 euid=1000 comm="bash" exe="/usr/bin/bash" ses=1
+type=SOCKADDR msg=audit(1725681602.300:102): addr=10.0.0.5 port=443 protocol=tcp

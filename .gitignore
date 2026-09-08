@@ -93,6 +93,8 @@ pnpm-debug.log*
 
 data/raw/*
 data/reports/*
+data/dataset_*/raw/*
+data/dataset_*/reports/*
 
 # 如果以后需要保留空目录，可以放 .gitkeep
 !data/raw/.gitkeep
@@ -104,6 +106,7 @@ data/reports/*
 
 *.log
 !backend/fixtures/scenarios/**/*.log
+!backend/fixtures/collectors/**/*.log
 
 
 # ---------------------------------------------------------

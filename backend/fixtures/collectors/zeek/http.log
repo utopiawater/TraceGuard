@@ -1,0 +1,1 @@
+{"ts":1725681602.1,"uid":"H1","id.orig_h":"10.0.0.4","id.orig_p":51516,"id.resp_h":"93.184.216.34","id.resp_p":80,"proto":"tcp","method":"GET","host":"example.com","uri":"/","service":"http","orig_bytes":80,"resp_bytes":1200}

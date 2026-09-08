@@ -5,14 +5,14 @@ TraceGuard 是面向 2026 网络空间安全课程设计的证据驱动攻击溯
 ## 当前已接通的主路径
 
 ```text
-Windows Security / Sysmon XML + Auditd / Wazuh JSON + Zeek JSON
+Windows Security / Sysmon XML + Auditd / Wazuh JSON + Zeek JSON + DARPA TC E3 CADets
 → RawEventEnvelope → append-only archive
 → UnifiedSecurityEvent → Entity Resolver → Sessionizer
 → SQLite → Graph Projector → DetectionResult
 → ATT&CK Mapping → AttackChain → REST API → Web 调查台
 ```
 
-当前完整场景覆盖 Windows/Linux/Network 三域、Auditd 复合事件、Wazuh 告警、Zeek conn/dns/http/files/weird/notice/ICMP、代表性主机行为和 DNS/HTTP/ICMP 隐蔽信道，并形成带 Evidence 的七阶段攻击链。fixture 与实时来源共用同一 Adapter。
+当前完整场景覆盖 Windows/Linux/Network 三域、Auditd 复合事件、Wazuh 告警、Zeek conn/dns/http/files/weird/notice/ICMP、代表性主机行为和 DNS/HTTP/ICMP 隐蔽信道，并形成带 Evidence 的七阶段攻击链。fixture、实时来源和 DARPA TC E3 CADets 公开数据集均复用同一主管道。
 
 ## 本地运行
 
@@ -47,6 +47,14 @@ powershell -ExecutionPolicy Bypass -File .\scripts\stop.ps1
 .\.venv\Scripts\python.exe scripts/replay_scenario.py --scenario backend/fixtures/scenarios/full_attack_chain --run-id run_full_multisource_001
 ```
 
+需要重新生成 DARPA TC E3 CADets 公开数据集实验结果时，在服务停止状态执行：
+
+```powershell
+.\.venv\Scripts\python.exe scripts/replay_dataset.py --dataset datasets/darpa_tc_e3_cadets --data-dir data/dataset_e3 --run-id run_darpa_tc_e3_001 --reset --quick-investigation --agent-fallback
+```
+
+数据集实验报告写入 `data/dataset_e3/dataset_run_report.json`，前端 `/datasets` 页面和 `/api/datasets` 会读取该真实报告。Ground Truth、官方 IOC、`attack_graph.json`、`attack_timeline.json` 和 `agent_input.json` 只用于 evaluation，不用于生成 Detection、ATT&CK、AttackChain 或 Agent Finding。
+
 Agent 调查中心保留两种调用范围：完整调查执行六个 Agent；快速调查执行 Coordinator、Host、Network、Correlation。两者共用真实 Tool、严格 Schema 和 EvidenceValidator；模型不可用时明确记录为 `deterministic_fallback`，不会伪装成 `real_llm`。
 
 Docker Compose 同样使用 Python 3.13 镜像；容器 Web 入口为 `http://127.0.0.1:8080`。
@@ -59,11 +67,14 @@ Docker Compose 同样使用 Python 3.13 镜像；容器 Web 入口为 `http://12
 .\.venv\Scripts\python.exe scripts/self_check.py
 .\.venv\Scripts\python.exe -m pytest
 cd frontend
+npm test
 npm run build
 ```
 
 `self_check.py` 验证主管道、证据外键、图投影、幂等与 Agent 工具权限。普通自动化测试使用 Fake ModelClient，不消耗真实 LLM Token。正式真实模型验收记录保存在 `artifacts/release/`。
 
-## 真实空状态
+## 数据集与靶场状态
 
-公开数据集尚未接入时，API 返回空 `data` 与明确 `meta.warnings`；前端不会以 Mock 数据替代。Wazuh、Sysmon、Auditd、Zeek 已进入统一主管道，Dataset Adapter 保留明确的未接入状态。
+DARPA TC E3 CADets 公开数据集已接入统一主管道，当前验证规模为 20,776 条事件，生成 348 条 Detection、1 条 AttackChain 和可回查 Evidence。若没有生成过 `data/dataset_e3/dataset_run_report.json`，数据集页面会保持真实空状态，不使用 Mock 数据。
+
+8+ 节点真实靶场由云平台同学部署。本仓库提供拓扑、采集规范和日志 bundle 接入契约；云端导出的 Wazuh/Sysmon/Auditd/Zeek 日志到位后，可按 `docs/13_cloud_testbed_handoff.md` 接入 TraceGuard。

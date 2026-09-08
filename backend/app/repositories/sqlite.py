@@ -1,7 +1,7 @@
 import json
 import sqlite3
 from pathlib import Path
-from typing import Any, Iterable, List, Optional, Type, TypeVar
+from typing import Any, Iterable, List, Optional, Sequence, Type, TypeVar
 
 from pydantic import BaseModel
 
@@ -78,6 +78,11 @@ class SQLiteRepository:
         with self.connect() as connection:
             return {table: connection.execute("SELECT COUNT(*) FROM %s" % table).fetchone()[0] for table in tables}
 
+    def list_runs(self, limit: int = 100) -> List[dict]:
+        with self.connect() as connection:
+            rows = connection.execute("SELECT * FROM runs ORDER BY started_at DESC LIMIT ?", (limit,)).fetchall()
+        return [dict(row) for row in rows]
+
     def append_events(self, run_id: str, events: List[UnifiedSecurityEvent]) -> int:
         rows = [(e.event_id, run_id, e.event_time.isoformat(), e.source.kind.value, e.source.sensor_id,
                  e.host.entity_id if e.host else None, e.action, e.event_type, e.severity,
@@ -121,10 +126,86 @@ class SQLiteRepository:
             rows = connection.execute("SELECT %s FROM %s ORDER BY rowid DESC LIMIT ?" % (json_column, table), (limit,)).fetchall()
         return [model.model_validate_json(row[0]) for row in reversed(rows)]
 
-    def list_events(self, limit: int = 100) -> List[UnifiedSecurityEvent]:
+    def _query_models(self, table: str, json_column: str, model: Type[T], where: List[str], params: List[Any], order_by: str, limit: int, offset: int = 0) -> List[T]:
+        allowed = {
+            ("normalized_events", "event_json", "event_time"),
+            ("evidence", "evidence_json", "observed_at"),
+            ("sessions", "session_json", "start_time"),
+            ("detections", "detection_json", "created_at"),
+            ("attack_chains", "chain_json", "start_time"),
+        }
+        if (table, json_column, order_by) not in allowed:
+            raise ValueError("query is not allowed")
+        clause = " WHERE " + " AND ".join(where) if where else ""
+        sql = "SELECT %s FROM %s%s ORDER BY %s ASC LIMIT ? OFFSET ?" % (json_column, table, clause, order_by)
+        with self.connect() as connection:
+            rows = connection.execute(sql, (*params, limit, offset)).fetchall()
+        return [model.model_validate_json(row[0]) for row in rows]
+
+    def list_events(self, limit: int = 100, run_id: Optional[str] = None) -> List[UnifiedSecurityEvent]:
+        if run_id:
+            return self.query_events(run_id=run_id, limit=limit)
         return self._list_models("normalized_events", "event_json", UnifiedSecurityEvent, limit)
 
-    def list_evidence(self, limit: int = 100) -> List[Evidence]:
+    def query_events(
+        self,
+        run_id: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
+        start_time: Optional[str] = None,
+        end_time: Optional[str] = None,
+        source_kinds: Optional[Sequence[str]] = None,
+        host_id: Optional[str] = None,
+        actions: Optional[Sequence[str]] = None,
+        action_prefix: Optional[str] = None,
+        entity_id: Optional[str] = None,
+        process: Optional[str] = None,
+        ip: Optional[str] = None,
+        text: Optional[str] = None,
+    ) -> List[UnifiedSecurityEvent]:
+        where: List[str] = []
+        params: List[Any] = []
+        if run_id:
+            where.append("run_id = ?")
+            params.append(run_id)
+        if start_time:
+            where.append("event_time >= ?")
+            params.append(start_time)
+        if end_time:
+            where.append("event_time <= ?")
+            params.append(end_time)
+        if source_kinds:
+            where.append("source_kind IN (%s)" % ",".join("?" for _ in source_kinds))
+            params.extend(source_kinds)
+        if host_id:
+            where.append("host_id = ?")
+            params.append(host_id)
+        action_terms = []
+        if actions:
+            for action in actions:
+                if action.endswith(".") or action.endswith("*"):
+                    action_terms.append("action LIKE ?")
+                    params.append(action.rstrip("*") + "%")
+                else:
+                    action_terms.append("action = ?")
+                    params.append(action)
+        if action_prefix:
+            action_terms.append("action LIKE ?")
+            params.append(action_prefix.rstrip("*") + "%")
+        if action_terms:
+            where.append("(" + " OR ".join(action_terms) + ")")
+        for value in (entity_id, process, ip):
+            if value:
+                where.append("event_json LIKE ?")
+                params.append("%" + value + "%")
+        if text:
+            where.append("LOWER(event_json) LIKE ?")
+            params.append("%" + text.lower() + "%")
+        return self._query_models("normalized_events", "event_json", UnifiedSecurityEvent, where, params, "event_time", limit, offset)
+
+    def list_evidence(self, limit: int = 100, run_id: Optional[str] = None) -> List[Evidence]:
+        if run_id:
+            return self._query_models("evidence", "evidence_json", Evidence, ["run_id = ?"], [run_id], "observed_at", limit, 0)
         return self._list_models("evidence", "evidence_json", Evidence, limit)
 
     def get_evidence(self, evidence_id: str) -> Optional[Evidence]:
@@ -132,22 +213,67 @@ class SQLiteRepository:
             row = connection.execute("SELECT evidence_json FROM evidence WHERE evidence_id = ?", (evidence_id,)).fetchone()
         return Evidence.model_validate_json(row[0]) if row else None
 
+    def get_evidence_run_id(self, evidence_id: str) -> Optional[str]:
+        with self.connect() as connection:
+            row = connection.execute("SELECT run_id FROM evidence WHERE evidence_id = ?", (evidence_id,)).fetchone()
+        return str(row[0]) if row else None
+
+    def evidence_ids_for_run(self, run_id: str) -> List[str]:
+        with self.connect() as connection:
+            rows = connection.execute("SELECT evidence_id FROM evidence WHERE run_id = ?", (run_id,)).fetchall()
+        return [str(row[0]) for row in rows]
+
     def get_event(self, event_id: str) -> Optional[UnifiedSecurityEvent]:
         return self._get_model("normalized_events", "event_id", event_id, "event_json", UnifiedSecurityEvent)
 
-    def list_sessions(self, limit: int = 100) -> List[Session]:
+    def list_sessions(self, limit: int = 100, run_id: Optional[str] = None) -> List[Session]:
+        if run_id:
+            return self.query_sessions(run_id=run_id, limit=limit)
         return self._list_models("sessions", "session_json", Session, limit)
+
+    def query_sessions(
+        self,
+        run_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        host_id: Optional[str] = None,
+        ip: Optional[str] = None,
+        session_type: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> List[Session]:
+        where: List[str] = []
+        params: List[Any] = []
+        if run_id:
+            where.append("run_id = ?")
+            params.append(run_id)
+        if session_id:
+            where.append("session_id = ?")
+            params.append(session_id)
+        if host_id:
+            where.append("host_id = ?")
+            params.append(host_id)
+        if ip:
+            where.append("(src_ip = ? OR dst_ip = ?)")
+            params.extend([ip, ip])
+        if session_type:
+            where.append("session_type = ?")
+            params.append(session_type)
+        return self._query_models("sessions", "session_json", Session, where, params, "start_time", limit, offset)
 
     def get_session(self, session_id: str) -> Optional[Session]:
         return self._get_model("sessions", "session_id", session_id, "session_json", Session)
 
-    def list_detections(self, limit: int = 100) -> List[DetectionResult]:
+    def list_detections(self, limit: int = 100, run_id: Optional[str] = None) -> List[DetectionResult]:
+        if run_id:
+            return self._query_models("detections", "detection_json", DetectionResult, ["run_id = ?"], [run_id], "created_at", limit, 0)
         return self._list_models("detections", "detection_json", DetectionResult, limit)
 
     def get_detection(self, detection_id: str) -> Optional[DetectionResult]:
         return self._get_model("detections", "detection_id", detection_id, "detection_json", DetectionResult)
 
-    def list_chains(self, limit: int = 100) -> List[AttackChain]:
+    def list_chains(self, limit: int = 100, run_id: Optional[str] = None) -> List[AttackChain]:
+        if run_id:
+            return self._query_models("attack_chains", "chain_json", AttackChain, ["run_id = ?"], [run_id], "start_time", limit, 0)
         return self._list_models("attack_chains", "chain_json", AttackChain, limit)
 
     def get_chain(self, chain_id: str) -> Optional[AttackChain]:
@@ -163,6 +289,21 @@ class SQLiteRepository:
         with self.connect() as connection:
             row = connection.execute("SELECT %s FROM %s WHERE %s = ?" % (json_column, table, id_column), (value,)).fetchone()
         return model.model_validate_json(row[0]) if row else None
+
+    def any_events_in_run(self, event_ids: Sequence[str], run_id: str) -> bool:
+        if not event_ids:
+            return False
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT 1 FROM normalized_events WHERE run_id = ? AND event_id IN (%s) LIMIT 1" % ",".join("?" for _ in event_ids),
+                (run_id, *event_ids),
+            ).fetchone()
+        return row is not None
+
+    def event_ids_for_run(self, run_id: str) -> List[str]:
+        with self.connect() as connection:
+            rows = connection.execute("SELECT event_id FROM normalized_events WHERE run_id = ?", (run_id,)).fetchall()
+        return [str(row[0]) for row in rows]
 
     def put_agent_task(self, task: AgentTask, runtime: Optional[dict] = None) -> None:
         payload = {"task": task.model_dump(mode="json"), "runtime": runtime or {}}

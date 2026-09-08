@@ -1,5 +1,5 @@
 from uuid import uuid4
-from typing import Literal
+from typing import Literal, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
@@ -12,8 +12,8 @@ router = APIRouter(tags=["investigation"])
 
 
 @router.get("/detections")
-def detections(limit: int = Query(default=100, ge=1, le=500), repo: SQLiteRepository = Depends(repository)) -> dict:
-    return response([item.model_dump(mode="json") for item in repo.list_detections(limit)])
+def detections(limit: int = Query(default=100, ge=1, le=500), run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository)) -> dict:
+    return response([item.model_dump(mode="json") for item in repo.list_detections(limit, run_id=run_id)])
 
 
 @router.get("/alerts")
@@ -23,13 +23,13 @@ def alerts(repo: SQLiteRepository = Depends(repository)) -> dict:
 
 
 @router.get("/chains")
-def chains(limit: int = Query(default=100, ge=1, le=500), repo: SQLiteRepository = Depends(repository)) -> dict:
-    return response([item.model_dump(mode="json") for item in repo.list_chains(limit)])
+def chains(limit: int = Query(default=100, ge=1, le=500), run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository)) -> dict:
+    return response([item.model_dump(mode="json") for item in repo.list_chains(limit, run_id=run_id)])
 
 
 @router.get("/chains/{chain_id}")
 def chain(chain_id: str, repo: SQLiteRepository = Depends(repository)) -> dict:
-    item = next((value for value in repo.list_chains(500) if value.chain_id == chain_id), None)
+    item = repo.get_chain(chain_id)
     if not item:
         raise HTTPException(status_code=404, detail="attack chain not found")
     return response(item.model_dump(mode="json"))

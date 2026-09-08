@@ -1,0 +1,395 @@
+{
+  "dataset_id": "darpa_tc_e3_cadets",
+  "dataset_name": "DARPA TC E3 CADets",
+  "source": "DARPA Transparent Computing E3 / ta1-cadets-e3-official-2",
+  "scenario": "E3-CADETS-20180412-nginx",
+  "scenario_description": "TC_Ground_Truth_Report_E3_Update.pdf section 3.13, PDF pages 26-29 (printed 23-26)",
+  "run_id": "run_darpa_tc_e3_001",
+  "status": "completed",
+  "input_records": 20776,
+  "records": 20776,
+  "accepted_raw": 20776,
+  "normalized_records": 20776,
+  "normalized": 20776,
+  "failed_records": 0,
+  "duplicate_records": 0,
+  "mapping_rate": 1.0,
+  "unknown_action_count": 0,
+  "mapping_warnings": {},
+  "action_mapping_distribution": {
+    "process.activity": 15263,
+    "file.close": 2724,
+    "network.receive": 569,
+    "file.read": 517,
+    "memory.map": 476,
+    "file.seek": 403,
+    "file.open": 391,
+    "network.send": 167,
+    "memory.protect": 85,
+    "process.ipc": 30,
+    "privilege.change": 25,
+    "file.write": 25,
+    "process.start": 24,
+    "process.execute": 20,
+    "process.stop": 17,
+    "network.accept": 13,
+    "network.connect": 10,
+    "file.delete": 9,
+    "file.modify": 8
+  },
+  "input_action_distribution": {
+    "aue_fcntl": 15247,
+    "aue_close": 2724,
+    "aue_recvfrom": 569,
+    "aue_read": 492,
+    "aue_mmap": 476,
+    "aue_lseek": 403,
+    "aue_openat_rwtc": 327,
+    "aue_sendto": 165,
+    "aue_mprotect": 85,
+    "aue_open_rwtc": 64,
+    "aue_write": 25,
+    "aue_pread": 25,
+    "aue_fork": 22,
+    "aue_execve": 20,
+    "aue_pipe": 20,
+    "aue_exit": 17,
+    "aue_accept": 13,
+    "aue_chdir": 10,
+    "aue_connect": 10,
+    "aue_socketpair": 10,
+    "aue_unlink": 9,
+    "aue_setegid": 8,
+    "aue_seteuid": 8,
+    "aue_chmod": 8,
+    "aue_umask": 6,
+    "aue_setgid": 3,
+    "aue_setlogin": 3,
+    "aue_setuid": 3,
+    "aue_vfork": 2,
+    "aue_writev": 2
+  },
+  "entity_count": 461,
+  "session_count": 16,
+  "detection_count": 348,
+  "detection_rule_counts": {
+    "det.host.sensitive_file_collection": 156,
+    "det.host.memory_tampering": 85,
+    "det.network.service_process_external_connection": 68,
+    "det.host.privilege_escalation": 25,
+    "det.host.temp_directory_execution": 13,
+    "det.network.service_scanning": 1
+  },
+  "evidence_count": 20776,
+  "attack_technique_ids": [
+    "T1005",
+    "T1046",
+    "T1055",
+    "T1059",
+    "T1068",
+    "T1071.001"
+  ],
+  "technique_ids": [
+    "T1005",
+    "T1046",
+    "T1055",
+    "T1059",
+    "T1068",
+    "T1071.001"
+  ],
+  "attack_technique_count": 6,
+  "technique_count": 6,
+  "attack_chain_count": 1,
+  "chain_count": 1,
+  "attack_chains": [
+    {
+      "chain_id": "chain_ab5642f031db21f94ecd8e8a",
+      "score": 0.684,
+      "completeness": 0.571,
+      "steps": [
+        {
+          "stage": "command_and_control",
+          "technique_id": "T1071.001",
+          "detection_ids": [
+            "det_4beddb5ecba0e7553bc88c55"
+          ],
+          "event_ids": [
+            "evt_5fa877d17dd2d43a59b8be2e"
+          ],
+          "evidence_ids": [
+            "evd_ee68b7ca50200386c0b8d2f9"
+          ]
+        },
+        {
+          "stage": "collection",
+          "technique_id": "T1005",
+          "detection_ids": [
+            "det_bf19536946a1604874224ad8"
+          ],
+          "event_ids": [
+            "evt_fa195e9f6bf9b331cd09b7b3"
+          ],
+          "evidence_ids": [
+            "evd_1ec9e8124a05cb292de3f8d3"
+          ]
+        },
+        {
+          "stage": "execution",
+          "technique_id": "T1059",
+          "detection_ids": [
+            "det_26d674fdcdb2949b454cec60"
+          ],
+          "event_ids": [
+            "evt_dad058a367d11739ae83a71b"
+          ],
+          "evidence_ids": [
+            "evd_4a30a1edd67475cfb4352cc6"
+          ]
+        },
+        {
+          "stage": "privilege_escalation",
+          "technique_id": "T1068",
+          "detection_ids": [
+            "det_0ed5bdab14760a91a6af16ba"
+          ],
+          "event_ids": [
+            "evt_b3c6033a69db90fdad481d7f"
+          ],
+          "evidence_ids": [
+            "evd_3d740acf6f600ebf5a0cff33"
+          ]
+        }
+      ],
+      "evidence_ids": [
+        "evd_1ec9e8124a05cb292de3f8d3",
+        "evd_3d740acf6f600ebf5a0cff33",
+        "evd_4a30a1edd67475cfb4352cc6",
+        "evd_ee68b7ca50200386c0b8d2f9"
+      ]
+    }
+  ],
+  "ioc_coverage": {
+    "covered": 99,
+    "total": 776,
+    "rate": 0.127577
+  },
+  "ioc_coverage_analysis": {
+    "uncovered_ioc_events": 677,
+    "action_distribution": {
+      "aue_recvfrom": 551,
+      "aue_sendto": 94,
+      "aue_open_rwtc": 8,
+      "aue_chmod": 8,
+      "aue_unlink": 7,
+      "aue_close": 3,
+      "aue_connect": 3,
+      "aue_execve": 3
+    },
+    "event_type_distribution": {
+      "recvfrom": 551,
+      "sendto": 94,
+      "open": 8,
+      "modify_file_attributes": 8,
+      "unlink": 7,
+      "close": 3,
+      "connect": 3,
+      "execute": 3
+    },
+    "process_distribution": {
+      "nginx": 351,
+      "XIM": 287,
+      "test": 36,
+      "sshd": 2,
+      "cron": 1
+    },
+    "selection_reason_distribution": {
+      "official_network_ioc": 651,
+      "official_file_ioc": 26
+    },
+    "network_ioc_events": 651,
+    "file_ioc_events": 26,
+    "top_file_paths": {
+      "/var/log/sendmail": 5,
+      "/var/log/netlog": 4,
+      "/tmp/tmux-1002": 3,
+      "/tmp/font": 3,
+      "/tmp/XIM": 3,
+      "/tmp/main": 3,
+      "/tmp/test": 3,
+      "/tmp/minions": 2
+    },
+    "low_semantic_syscall_events": 648,
+    "low_semantic_rate": 0.957164,
+    "assessment": "未覆盖 IOC 主要由重复网络收发系统调用构成；少量文件 IOC 属于落地、chmod、unlink、执行序列，应作为后续通用规则候选而不是本次用 Ground Truth 追指标。",
+    "potential_detection_gaps": [
+      "可考虑后续增加通用文件落地/授权变更/删除序列检测，但本次未为提高 IOC coverage 自动新增规则。"
+    ]
+  },
+  "stage_coverage": {
+    "covered": 4,
+    "total": 4,
+    "rate": 1.0,
+    "stages": [
+      "execution",
+      "privilege_escalation",
+      "collection",
+      "command_and_control"
+    ]
+  },
+  "evidence_backtrace_rate": 1.0,
+  "chain_evidence_coverage": [
+    {
+      "chain_id": "chain_ab5642f031db21f94ecd8e8a",
+      "covered": 4,
+      "total": 4
+    }
+  ],
+  "runtime_seconds": 221.934,
+  "events_per_second": 93.614,
+  "precision": null,
+  "recall": null,
+  "f1": null,
+  "f1_reason": "该 DARPA TC E3 CADets 实验切片仅提供 IOC 命中及相关上下文信息，不具备完备逐事件 benign/attack 二分类真值，因此不报告二分类 Precision、Recall 和 F1。",
+  "limitations": [
+    "该 DARPA TC E3 CADets 实验切片仅提供 IOC 命中及相关上下文信息，不具备完备逐事件 benign/attack 二分类真值，因此不报告二分类 Precision、Recall 和 F1。",
+    "attack_graph.json、attack_timeline.json 与 agent_input.json 未用于生成 Detection 或 AttackChain。"
+  ],
+  "inspection": {
+    "dataset_id": "darpa_tc_e3_cadets",
+    "dataset_name": "DARPA TC E3 CADets",
+    "source": "DARPA Transparent Computing E3 / ta1-cadets-e3-official-2",
+    "scenario": "E3-CADETS-20180412-nginx",
+    "scenario_description": "TC_Ground_Truth_Report_E3_Update.pdf section 3.13, PDF pages 26-29 (printed 23-26)",
+    "counts": {
+      "process_events.json": 15441,
+      "network_events.json": 765,
+      "file_events.json": 4570
+    },
+    "total_events": 20776,
+    "event_type_distribution": {
+      "fcntl": 15247,
+      "close": 2724,
+      "recvfrom": 569,
+      "read": 517,
+      "mmap": 476,
+      "lseek": 403,
+      "open": 391,
+      "sendto": 165,
+      "mprotect": 85,
+      "create_object": 30,
+      "write": 27,
+      "process_create": 24,
+      "change_principal": 22,
+      "execute": 20,
+      "exit": 17,
+      "modify_process": 16,
+      "accept": 13,
+      "connect": 10,
+      "unlink": 9,
+      "modify_file_attributes": 8,
+      "login": 3
+    },
+    "action_distribution": {
+      "aue_fcntl": 15247,
+      "aue_close": 2724,
+      "aue_recvfrom": 569,
+      "aue_read": 492,
+      "aue_mmap": 476,
+      "aue_lseek": 403,
+      "aue_openat_rwtc": 327,
+      "aue_sendto": 165,
+      "aue_mprotect": 85,
+      "aue_open_rwtc": 64,
+      "aue_write": 25,
+      "aue_pread": 25,
+      "aue_fork": 22,
+      "aue_execve": 20,
+      "aue_pipe": 20,
+      "aue_exit": 17,
+      "aue_accept": 13,
+      "aue_chdir": 10,
+      "aue_connect": 10,
+      "aue_socketpair": 10,
+      "aue_unlink": 9,
+      "aue_setegid": 8,
+      "aue_seteuid": 8,
+      "aue_chmod": 8,
+      "aue_umask": 6,
+      "aue_setgid": 3,
+      "aue_setlogin": 3,
+      "aue_setuid": 3,
+      "aue_vfork": 2,
+      "aue_writev": 2
+    },
+    "host_distribution": {
+      "83C8ED1F-5045-DBCD-B39F-918F0DF4F851": 20776
+    },
+    "process_distribution": {
+      "test": 17777,
+      "nginx": 1493,
+      "XIM": 443,
+      "master": 245,
+      "cron": 110,
+      "tmux-1002": 106,
+      "minions": 106,
+      "sendmail": 106,
+      "sshd": 89,
+      "atrun": 82,
+      "sh": 72,
+      "main": 53,
+      "inetd": 52,
+      "uname": 42
+    },
+    "attack_label_distribution": {
+      "context": 20000,
+      "ioc_match": 776
+    },
+    "network_field_shapes": {
+      "source": {
+        "[]": 20011,
+        "['ip', 'port']": 765
+      },
+      "destination": {
+        "[]": 20011,
+        "['ip', 'port']": 765
+      }
+    },
+    "file_field_shapes": {
+      "False": 19804,
+      "True": 972
+    },
+    "subject_object_shapes": {
+      "['subject_id']": 68,
+      "['object2_id', 'object_id', 'subject_id']": 22,
+      "['object_id', 'subject_id']": 1718,
+      "['parent_subject_id', 'subject_id']": 15267,
+      "['object_id', 'parent_subject_id', 'subject_id']": 3670,
+      "['object2_id', 'object_id', 'parent_subject_id', 'subject_id']": 31
+    },
+    "timestamp_format": "UTC ISO8601 with nanosecond fractional seconds and Z suffix",
+    "timestamp_min": "2018-04-12T18:00:22.876190369Z",
+    "timestamp_max": "2018-04-12T18:39:18.296137322Z",
+    "event_id_format": "cadets:record:<original-record-number>",
+    "unique_event_ids": 20776
+  },
+  "multi_agent": {
+    "case_id": "case_b9742e5aa7e5470f",
+    "chain_id": "chain_ab5642f031db21f94ecd8e8a",
+    "status": "succeeded",
+    "created_at": "2026-09-08T15:21:39.179369+00:00",
+    "finished_at": "2026-09-08T15:21:42.288364+00:00",
+    "final_confidence": 0.7654,
+    "scope": "quick",
+    "task_ids": [
+      "task_fa824e456c9247ffb62f",
+      "task_a2aa53eb04c742d5bbdf",
+      "task_36d81cda76384379a4fa",
+      "task_b5528271edd541629da0"
+    ],
+    "report_ids": [],
+    "model": {
+      "configured": false,
+      "model": "deterministic-fallback"
+    }
+  }
+}

@@ -10,6 +10,7 @@ from app.repositories import SQLiteRepository
 
 
 class EventSearchArgs(ContractModel):
+    run_id: Optional[str] = None
     actions: List[str] = Field(default_factory=list, max_length=20)
     source_kinds: List[str] = Field(default_factory=list, max_length=10)
     host_id: Optional[str] = None
@@ -19,11 +20,13 @@ class EventSearchArgs(ContractModel):
 
 
 class EntityTimelineArgs(ContractModel):
+    run_id: Optional[str] = None
     entity_id: str = Field(min_length=1, max_length=200)
     limit: int = Field(default=100, ge=1, le=200)
 
 
 class SessionLookupArgs(ContractModel):
+    run_id: Optional[str] = None
     session_id: Optional[str] = None
     host_id: Optional[str] = None
     ip: Optional[str] = None
@@ -38,18 +41,22 @@ class SessionLookupArgs(ContractModel):
 
 
 class GraphNeighborsArgs(ContractModel):
+    run_id: Optional[str] = None
     entity_id: str = Field(min_length=1, max_length=200)
     depth: int = Field(default=1, ge=1, le=3)
     limit: int = Field(default=50, ge=1, le=100)
 
 
 class GraphPathArgs(ContractModel):
+    run_id: Optional[str] = None
     source_entity_id: str = Field(min_length=1, max_length=200)
     target_entity_id: str = Field(min_length=1, max_length=200)
     max_depth: int = Field(default=4, ge=1, le=6)
+    max_edges: int = Field(default=3000, ge=100, le=10000)
 
 
 class IdsArgs(ContractModel):
+    run_id: Optional[str] = None
     ids: List[str] = Field(min_length=1, max_length=50)
 
 
@@ -66,6 +73,7 @@ class ChainValidateArgs(ContractModel):
 
 
 class SourceHealthArgs(ContractModel):
+    run_id: Optional[str] = None
     limit: int = Field(default=50, ge=1, le=100)
 
 
@@ -82,41 +90,41 @@ def _event_has_entity(event, entity_id: str) -> bool:
 
 
 def build_tool_gateway(repo: SQLiteRepository, graph, attack: MappingFileProvider) -> ToolGateway:
+    run_event_cache = {}
     def event_search(args: dict) -> dict:
-        values = []
-        needle = (args.get("text") or "").lower()
-        for event in repo.list_events(5000):
-            if args["actions"] and not any(event.action == action or event.action.startswith(action.rstrip("*") ) for action in args["actions"]):
-                continue
-            if args["source_kinds"] and event.source.kind.value not in args["source_kinds"]:
-                continue
-            if args.get("host_id") and (not event.host or event.host.entity_id != args["host_id"]):
-                continue
-            if args.get("entity_id") and not _event_has_entity(event, args["entity_id"]):
-                continue
-            if needle and needle not in ("%s %s %s" % (event.action, event.event_type, event.message or "")).lower():
-                continue
-            values.append(event.model_dump(mode="json"))
-        return {"events": values[:args["limit"]], "count": min(len(values), args["limit"]), "truncated": len(values) > args["limit"]}
+        rows = repo.query_events(
+            run_id=args.get("run_id"),
+            actions=args.get("actions") or None,
+            source_kinds=args.get("source_kinds") or None,
+            host_id=args.get("host_id"),
+            entity_id=args.get("entity_id"),
+            text=args.get("text"),
+            limit=args["limit"] + 1,
+        )
+        values = [event.model_dump(mode="json") for event in rows[:args["limit"]]]
+        return {"events": values, "count": len(values), "truncated": len(rows) > args["limit"]}
 
     def entity_timeline(args: dict) -> dict:
-        events = [event for event in repo.list_events(5000) if _event_has_entity(event, args["entity_id"])]
-        events.sort(key=lambda item: item.event_time)
+        events = repo.query_events(run_id=args.get("run_id"), entity_id=args["entity_id"], limit=args["limit"] + 1)
         return {"entity_id": args["entity_id"], "events": [item.model_dump(mode="json") for item in events[:args["limit"]]], "truncated": len(events) > args["limit"]}
 
     def session_lookup(args: dict) -> dict:
-        values = []
-        for session in repo.list_sessions(5000):
-            if args.get("session_id") and session.session_id != args["session_id"]:
-                continue
-            if args.get("host_id") and session.host_id != args["host_id"]:
-                continue
-            if args.get("ip") and args["ip"] not in {session.src_ip, session.dst_ip}:
-                continue
-            if args.get("session_type") and session.session_type != args["session_type"]:
-                continue
-            values.append(session.model_dump(mode="json"))
-        return {"sessions": values[:args["limit"]], "count": min(len(values), args["limit"]), "truncated": len(values) > args["limit"]}
+        rows = repo.query_sessions(
+            run_id=args.get("run_id"),
+            session_id=args.get("session_id"),
+            host_id=args.get("host_id"),
+            ip=args.get("ip"),
+            session_type=args.get("session_type"),
+            limit=args["limit"] + 1,
+        )
+        values = [session.model_dump(mode="json") for session in rows[:args["limit"]]]
+        return {"sessions": values, "count": len(values), "truncated": len(rows) > args["limit"]}
+
+    def _relation_in_scope(relation, run_id: Optional[str]) -> bool:
+        if not run_id:
+            return True
+        event_ids = run_event_cache.setdefault(run_id, set(repo.event_ids_for_run(run_id)))
+        return bool(set(relation.event_ids) & event_ids)
 
     def graph_neighbors(args: dict) -> dict:
         root, max_depth, limit = args["entity_id"], args["depth"], args["limit"]
@@ -124,6 +132,8 @@ def build_tool_gateway(repo: SQLiteRepository, graph, attack: MappingFileProvide
         for _ in range(max_depth):
             next_frontier = set()
             for relation in graph.relations.values():
+                if not _relation_in_scope(relation, args.get("run_id")):
+                    continue
                 if relation.source_entity_id in frontier or relation.target_entity_id in frontier:
                     edges.append(relation)
                     next_frontier.update([relation.source_entity_id, relation.target_entity_id])
@@ -137,9 +147,15 @@ def build_tool_gateway(repo: SQLiteRepository, graph, attack: MappingFileProvide
         return {"root_entity_id": root, "depth": max_depth, "nodes": entities[:limit], "edges": [item.model_dump(mode="json") for item in edges[:limit]], "truncated": len(edges) >= limit}
 
     def graph_path(args: dict) -> dict:
-        source, target, max_depth = args["source_entity_id"], args["target_entity_id"], args["max_depth"]
+        source, target, max_depth, max_edges = args["source_entity_id"], args["target_entity_id"], args["max_depth"], args["max_edges"]
         adjacency = {}
+        considered = 0
         for relation in graph.relations.values():
+            if not _relation_in_scope(relation, args.get("run_id")):
+                continue
+            considered += 1
+            if considered > max_edges:
+                break
             adjacency.setdefault(relation.source_entity_id, []).append((relation.target_entity_id, relation))
             adjacency.setdefault(relation.target_entity_id, []).append((relation.source_entity_id, relation))
         queue = deque([(source, [source], [])])
@@ -154,7 +170,7 @@ def build_tool_gateway(repo: SQLiteRepository, graph, attack: MappingFileProvide
                 if neighbor not in seen:
                     seen.add(neighbor)
                     queue.append((neighbor, nodes + [neighbor], relations + [relation]))
-        return {"found": False, "node_ids": [], "relations": [], "depth": None}
+        return {"found": False, "node_ids": [], "relations": [], "depth": None, "truncated": considered > max_edges}
 
     def detection_lookup(args: dict) -> dict:
         values = []
@@ -162,6 +178,8 @@ def build_tool_gateway(repo: SQLiteRepository, graph, attack: MappingFileProvide
             item = repo.get_detection(detection_id)
             if not item:
                 raise ValueError("detection does not exist: %s" % detection_id)
+            if args.get("run_id") and item.run_id != args["run_id"]:
+                raise ValueError("detection is outside requested run: %s" % detection_id)
             values.append(item.model_dump(mode="json"))
         return {"detections": values}
 
@@ -186,6 +204,8 @@ def build_tool_gateway(repo: SQLiteRepository, graph, attack: MappingFileProvide
             item = repo.get_evidence(evidence_id)
             if not item:
                 raise ValueError("evidence does not exist: %s" % evidence_id)
+            if args.get("run_id") and repo.get_evidence_run_id(evidence_id) != args["run_id"]:
+                raise ValueError("evidence is outside requested run: %s" % evidence_id)
             values.append(item.model_dump(mode="json"))
         return {"evidence": values}
 
@@ -225,7 +245,7 @@ def build_tool_gateway(repo: SQLiteRepository, graph, attack: MappingFileProvide
 
     def source_health(args: dict) -> dict:
         values = {}
-        for event in repo.list_events(5000):
+        for event in repo.query_events(run_id=args.get("run_id"), limit=50000):
             values[event.source.sensor_id] = {
                 "sensor_id": event.source.sensor_id, "kind": event.source.kind.value,
                 "last_event_time": event.event_time.isoformat(), "status": "healthy",

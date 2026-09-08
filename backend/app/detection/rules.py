@@ -1,3 +1,5 @@
+import ipaddress
+from collections import defaultdict
 from typing import Dict, List
 
 from app.contracts import AttackMapping, DetectionResult, Evidence, Session, UnifiedSecurityEvent
@@ -173,11 +175,135 @@ class MemoryTamperingRule:
     def evaluate(self, run_id, events, sessions, evidence):
         results = []
         for event in events:
-            if event.action not in {"memory.remote_thread", "memory.process_access", "memory.process_tamper"}:
+            if event.action not in {"memory.remote_thread", "memory.process_access", "memory.process_tamper", "memory.protect"}:
                 continue
             event_ids = [event.event_id]
             refs = [ref.entity_id for ref in (event.host, event.actor.process, event.object.ref) if ref]
             results.append(DetectionResult(detection_id=stable_id("det", self.rule_id, event.event_id), run_id=run_id, rule_id=self.rule_id, rule_version=self.version, title="代表性内存篡改行为", detector_type="rule", severity="high", confidence=0.84, event_ids=event_ids, entity_ids=refs, feature_values={"sysmon_event_id": event.extensions.get("event_id"), "action": event.action}, reason="Sysmon 记录到远程线程、跨进程访问或进程篡改事件。", attack_mappings=[], evidence_ids=_evidence_for(event_ids, evidence), created_at=event.event_time))
+        return results
+
+
+class TempDirectoryExecutionRule:
+    rule_id = "det.host.temp_directory_execution"
+    version = "1.0.0"
+
+    def evaluate(self, run_id, events, sessions, evidence):
+        results = []
+        for event in events:
+            path = str((event.object.ref.attributes.get("normalized_path") if event.object.ref else "") or "").lower()
+            if event.action != "process.execute" or not (path.startswith("/tmp/") or path in {"/tmp", "/var/tmp"}):
+                continue
+            event_ids = [event.event_id]
+            refs = [ref.entity_id for ref in (event.host, event.actor.user, event.actor.process, event.actor.parent_process, event.object.ref) if ref]
+            results.append(DetectionResult(
+                detection_id=stable_id("det", self.rule_id, self.version, event.event_id),
+                run_id=run_id,
+                rule_id=self.rule_id,
+                rule_version=self.version,
+                title="临时目录可执行文件运行",
+                detector_type="rule",
+                severity="high",
+                confidence=0.86,
+                event_ids=event_ids,
+                entity_ids=sorted(set(refs)),
+                feature_values={"path": path, "process": event.actor.process.display_name if event.actor.process else None, "outcome": event.outcome},
+                reason="进程尝试从 /tmp 等临时目录执行文件，该位置常用于暂存下载载荷或一次性工具。",
+                attack_mappings=[],
+                evidence_ids=_evidence_for(event_ids, evidence),
+                created_at=event.event_time,
+            ))
+        return results
+
+
+class ServiceProcessExternalConnectionRule:
+    rule_id = "det.network.service_process_external_connection"
+    version = "1.0.0"
+
+    def evaluate(self, run_id, events, sessions, evidence):
+        service_names = ("nginx", "httpd", "apache2", "iisexpress", "w3wp")
+        results = []
+        for event in events:
+            if event.action not in {"network.connect", "network.send"} or not event.network or not event.actor.process:
+                continue
+            image = str(event.actor.process.display_name or event.actor.process.attributes.get("image") or "").lower()
+            if not any(name in image for name in service_names):
+                continue
+            dst_ip = event.network.dst.ip
+            if not dst_ip or not self._is_public(dst_ip):
+                continue
+            event_ids = [event.event_id]
+            refs = [ref.entity_id for ref in (event.host, event.actor.process, event.object.ref) if ref]
+            results.append(DetectionResult(
+                detection_id=stable_id("det", self.rule_id, self.version, event.event_id),
+                run_id=run_id,
+                rule_id=self.rule_id,
+                rule_version=self.version,
+                title="服务进程异常外部通信",
+                detector_type="rule",
+                severity="medium",
+                confidence=0.74,
+                event_ids=event_ids,
+                entity_ids=sorted(set(refs)),
+                session_ids=[event.network.session_id] if event.network.session_id else [],
+                feature_values={"process": image, "destination": dst_ip, "port": event.network.dst.port, "action": event.action},
+                reason="面向入站请求的服务进程主动连接或发送数据到公网地址，需结合上下文复核是否为反连、代理或异常上游通信。",
+                attack_mappings=[],
+                evidence_ids=_evidence_for(event_ids, evidence),
+                created_at=event.event_time,
+            ))
+        return results
+
+    @staticmethod
+    def _is_public(value: str) -> bool:
+        try:
+            ip = ipaddress.ip_address(value)
+            return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved)
+        except ValueError:
+            return False
+
+
+class NetworkServiceScanningRule:
+    rule_id = "det.network.service_scanning"
+    version = "1.0.0"
+
+    def evaluate(self, run_id, events, sessions, evidence):
+        by_process = defaultdict(list)
+        for event in events:
+            if not event.network or not event.actor.process or event.action not in {"network.connect", "network.send", "network.receive", "network.accept"}:
+                continue
+            key = (event.host.entity_id if event.host else None, event.actor.process.entity_id)
+            by_process[key].append(event)
+        results = []
+        for _, items in by_process.items():
+            items.sort(key=lambda item: item.event_time)
+            for index, first in enumerate(items):
+                window = [item for item in items[index:] if 0 <= (item.event_time - first.event_time).total_seconds() <= 300]
+                targets = sorted({(item.network.dst.ip, item.network.dst.port) for item in window if item.network.dst.ip and item.network.dst.port})
+                if len(targets) < 4:
+                    continue
+                selected = window[:20]
+                event_ids = [item.event_id for item in selected]
+                refs = sorted({ref.entity_id for item in selected for ref in (item.host, item.actor.process, item.object.ref) if ref})
+                sessions_ids = sorted({item.network.session_id for item in selected if item.network.session_id})
+                results.append(DetectionResult(
+                    detection_id=stable_id("det", self.rule_id, self.version, event_ids),
+                    run_id=run_id,
+                    rule_id=self.rule_id,
+                    rule_version=self.version,
+                    title="网络服务扫描行为",
+                    detector_type="threshold",
+                    severity="medium",
+                    confidence=0.78,
+                    event_ids=event_ids,
+                    entity_ids=refs,
+                    session_ids=sessions_ids,
+                    feature_values={"distinct_targets": len(targets), "sample_targets": ["%s:%s" % target for target in targets[:12]], "window_seconds": 300},
+                    reason="同一主机进程在短时间内触达多个不同 IP/端口组合，符合网络服务发现或扫描的统计特征。",
+                    attack_mappings=[],
+                    evidence_ids=_evidence_for(event_ids, evidence),
+                    created_at=max(item.event_time for item in selected),
+                ))
+                break
         return results
 
 

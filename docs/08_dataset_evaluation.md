@@ -1,8 +1,8 @@
 # 互联网公开攻击数据集验证设计
 
-## 1. 结论
+## 1. 当前结论
 
-系统应把数据集看作“另一种 collector”，而不是另一套产品。所有离线记录先生成 RawEventEnvelope，再进入同一 normalizer、identity/session、detection、graph、ATT&CK 和 AttackChain 管道。
+系统已经把 DARPA TC E3 CADets 看作“另一种 collector”，而不是另一套产品。所有离线记录先生成 RawEventEnvelope，再进入同一 normalizer、identity/session、detection、graph、ATT&CK 和 AttackChain 管道。
 
 ```text
 Live Collector ──┐
@@ -10,7 +10,18 @@ Live Collector ──┐
 Dataset Adapter ─┘
 ```
 
-首轮建议从一个字段明确、下载规模可控的数据集切片完成闭环；高分版再用第二个异构数据集验证可迁移性。不要为了某一数据集的列名修改 UnifiedSecurityEvent。
+当前 P0 数据集选择为 DARPA TC E3 CADets 精简切片，已完成端到端运行。不要为了某一数据集的列名修改 UnifiedSecurityEvent。
+
+最新运行摘要：
+
+- dataset_id: `darpa_tc_e3_cadets`
+- dataset_name: `DARPA TC E3 CADets`
+- input_records: 20,776
+- normalized_records: 20,776
+- detection_count: 348
+- chain_count: 1
+- report: `data/dataset_e3/dataset_run_report.json`
+- Precision / Recall / F1: N/A，因为该切片不具备完备逐事件 benign/attack 二分类真值。
 
 ## 2. 候选数据集
 
@@ -19,6 +30,7 @@ Dataset Adapter ─┘
 | LANL Unified Host and Network | 企业环境主机与网络事件，适合认证、进程、DNS/NetFlow 等跨源关联和规模测试 | 数据匿名化、下载量大，标签与现代 Sysmon 不完全等价 | P0/P1 候选；先取单日/小时间窗 |
 | LANL Comprehensive Multi-Source | 多来源连续企业安全事件，可验证多源时序和 red-team 相关分析 | 真实企业数据匿名化，细粒度文件/注册表可能不足 | P1 补充 |
 | ToN_IoT | 同一研究环境并行采集网络、Windows 7/10、Ubuntu 14/18 和 IoT telemetry，含正常与多类攻击 | 各子集字段和标签粒度不同，不应假设每条记录都可一一跨源对齐 | P0 首选之一，选择 Windows/Linux/Network 小切片 |
+| DARPA TC E3 CADets | 高粒度主机/网络/file provenance，当前已预处理成 process/network/file 三类 JSON | 标签为 IOC/context，不是完备逐事件二分类真值 | 已作为 P0 正式数据集 |
 | DARPA OpTC | 高粒度主机/网络 provenance，适合图关系和长攻击链 | 体量、格式和预处理复杂，课程周期风险最高 | P2 或高分版 |
 | 网络专用数据集 | 适合 DNS/HTTP/流量 detector 的补充比较 | 无主机证据，不能单独证明完整溯源系统 | 只作 detector 辅助 |
 | 主机专用数据集 | 适合 Audit/Sysmon adapter 和进程图 | 无网络链，不能单独完成官方数据集验收 | 只作 adapter 辅助 |
@@ -42,7 +54,7 @@ LANL 官方数据页同时列出 multi-source 和 Unified Host and Network 数�
 - 若需要更强企业认证/网络链，选择 LANL 单日/已知 red-team 时间窗；
 - OpTC 只在 P0 已闭环且有足够存储后追加。
 
-最终数据集在实现阶段通过 spike 决定，本设计不锁死名称。
+最终 P0 数据集已选定为 DARPA TC E3 CADets。LANL、ToN_IoT、OpTC 可作为后续迁移性扩展，不作为当前验收必须项。
 
 ## 4. DatasetManifest
 

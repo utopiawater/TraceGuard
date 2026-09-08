@@ -2,9 +2,7 @@
 
 ## 1. 总体结论
 
-推荐沿“契约先行、最小闭环、真实数据替换、确定性链、Agent 最后接入”的顺序开发。最危险的路线是先搭满 8 节点、先做漂亮 Dashboard 或先接 LLM，然后才发现事件不能关联。
-
-本轮已完成需求和架构设计，尚未开始 Phase 0 的工程骨架与 Phase 1 的业务实现；需等待设计审核。
+项目已经越过工程骨架阶段，当前处于验收集成和材料冻结阶段。契约、主管道、检测、ATT&CK、AttackChain、Multi-Agent、前端和 DARPA 公开数据集均已接通；后续重点不应是重构，而是云靶场日志接入、最终报告/PPT、演示脚本和提交清单。
 
 ## 2. 依赖驱动的阶段
 
@@ -15,9 +13,9 @@
 | 2 真实适配器 | 接入 Wazuh/Sysmon/Auditd/Zeek | adapters、collector、time quality、sessionizers | 四源各有 golden/真实样例；Windows/Linux/Zeek 同一 schema | Phase 1 |
 | 3 检测与攻击链 | 完成 P0 检测、关联和专项路径 | rules、covert channel、entry/lateral/privilege/data lineage | Ground Truth 场景链指标达标；无关并发事件不误合并 | Phase 2 |
 | 4 Multi-Agent | 让 LLM 调查已有事实 | Harness、6 roles、tools、fallback report | 无不存在的 evidence/Technique；断网/模型失败可降级 | Phase 3 |
-| 5 8+ 节点靶场 | 完成规定角色和真实链 | 9 节点、manifest、replay bundle、录像素材 | 节点/采集/链/回滚清单全部通过 | Phase 2/3，可与 4 并行准备 |
-| 6 数据集实验 | 验证 Dataset Adapter 可迁移 | dataset slice、manifest、evaluation report | 至少一个公开数据集通过同一主管道，给出样本量和指标 | Phase 2/3 |
-| 7 交付与演示 | 稳定、文档、PPT、录像 | 报告、安装、测试、PPT、demo snapshot | 全新环境按文档启动；15 分钟脚本演练 3 次成功 | 全部 |
+| 5 8+ 节点靶场 | 由云平台同学完成规定角色和真实链 | 9 节点、manifest、replay bundle、录像素材 | 云端 bundle 可被 TraceGuard replay，节点/采集/链/回滚清单全部通过 | 外部并行 |
+| 6 数据集实验 | 验证 Dataset Adapter 可迁移 | DARPA slice、manifest、evaluation report | 已完成：20,776 条事件通过同一主管道，给出样本量和指标 | 已完成 |
+| 7 交付与演示 | 稳定、文档、PPT、录像 | 报告、安装、测试、PPT、demo snapshot | 全新环境按文档启动；15 分钟脚本演练 3 次成功 | 当前重点 |
 
 ## 3. 每阶段任务
 
@@ -88,15 +86,13 @@ RawEventEnvelope
 
 ## 4. 以 2026-09-12 验收为约束的压缩安排
 
-当前日期为 2026-09-07，完整高分版本的时间极紧。若验收日期不变，建议逆排：
+当前日期为 2026-09-09，主体系统和 DARPA 数据集已接通。若验收日期不变，建议逆排：
 
 | 日期 | 必须完成 |
 |---|---|
-| 09-07 | 审核本文档；冻结 P0、contracts 和第一条 sample chain |
-| 09-08 | Phase 0 + Phase 1；前端能看链和证据 |
-| 09-09 | Sysmon/Zeek/Auditd/Wazuh 关键适配；登录/进程/网络 session |
-| 09-10 | P0 检测、ATT&CK、链；8+ 节点连通和采集；数据集切片 |
-| 09-11 | Agent 最小闭环、完整靶场 replay、数据集指标、PPT/报告/录像 |
+| 09-09 | 冻结主架构和 Dataset 模块；同步文档；等待云靶场日志 bundle |
+| 09-10 | 接入云靶场导出日志；核对 run_id 隔离、Evidence、AttackChain 和 Agent quick/full |
+| 09-11 | 最终 PPT/报告/录像；演示脚本连续演练；清理提交清单和大文件策略 |
 | 09-12 | 只做现场环境验证和演示，不再改 schema/核心算法 |
 
 如果团队实际有更长开发窗口，仍按 Phase 顺序，不按日期强行并行核心依赖。
