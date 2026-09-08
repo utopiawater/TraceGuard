@@ -19,6 +19,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": true,
                   "type": "object",
                   "title": "Response Dashboard Api Dashboard Get"
                 }
@@ -56,6 +57,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "additionalProperties": true,
                   "title": "Response Events Api Events Get"
                 }
               }
@@ -102,6 +104,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "additionalProperties": true,
                   "title": "Response Sessions Api Sessions Get"
                 }
               }
@@ -148,6 +151,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "additionalProperties": true,
                   "title": "Response Evidence Api Evidence Get"
                 }
               }
@@ -191,6 +195,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "additionalProperties": true,
                   "title": "Response Evidence Detail Api Evidence  Evidence Id  Get"
                 }
               }
@@ -237,6 +242,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "additionalProperties": true,
                   "title": "Response Detections Api Detections Get"
                 }
               }
@@ -268,6 +274,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": true,
                   "type": "object",
                   "title": "Response Alerts Api Alerts Get"
                 }
@@ -305,6 +312,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "additionalProperties": true,
                   "title": "Response Chains Api Chains Get"
                 }
               }
@@ -348,7 +356,78 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "additionalProperties": true,
                   "title": "Response Chain Api Chains  Chain Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chains/{chain_id}/investigate": {
+      "post": {
+        "tags": [
+          "investigation"
+        ],
+        "summary": "Investigate Chain",
+        "operationId": "investigate_chain_api_chains__chain_id__investigate_post",
+        "parameters": [
+          {
+            "name": "chain_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chain Id"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "full",
+                "quick"
+              ],
+              "type": "string",
+              "default": "full",
+              "title": "Scope"
+            }
+          },
+          {
+            "name": "max_steps",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 12,
+              "minimum": 4,
+              "default": 12,
+              "title": "Max Steps"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Investigate Chain Api Chains  Chain Id  Investigate Post"
                 }
               }
             }
@@ -379,6 +458,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": true,
                   "type": "object",
                   "title": "Response Graph Slice Api Graph Get"
                 }
@@ -401,6 +481,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": true,
                   "type": "object",
                   "title": "Response Entities Api Entities Get"
                 }
@@ -423,6 +504,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": true,
                   "type": "object",
                   "title": "Response Hosts Api Hosts Get"
                 }
@@ -445,6 +527,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": true,
                   "type": "object",
                   "title": "Response Network Api Network Get"
                 }
@@ -467,52 +550,9 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": true,
                   "type": "object",
                   "title": "Response Attack Api Attack Get"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/agents": {
-      "get": {
-        "tags": [
-          "resources"
-        ],
-        "summary": "Agents",
-        "operationId": "agents_api_agents_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "title": "Response Agents Api Agents Get"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/attribution": {
-      "get": {
-        "tags": [
-          "resources"
-        ],
-        "summary": "Attribution",
-        "operationId": "attribution_api_attribution_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "title": "Response Attribution Api Attribution Get"
                 }
               }
             }
@@ -533,30 +573,9 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": true,
                   "type": "object",
                   "title": "Response Datasets Api Datasets Get"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/reports": {
-      "get": {
-        "tags": [
-          "resources"
-        ],
-        "summary": "Reports",
-        "operationId": "reports_api_reports_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "title": "Response Reports Api Reports Get"
                 }
               }
             }
@@ -577,8 +596,230 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": true,
                   "type": "object",
                   "title": "Response Sources Api Sources Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agents": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Agents",
+        "operationId": "agents_api_agents_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Agents Api Agents Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agents/{case_id}": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Agent Detail",
+        "operationId": "agent_detail_api_agents__case_id__get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Agent Detail Api Agents  Case Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/attribution": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Attribution",
+        "operationId": "attribution_api_attribution_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Attribution Api Attribution Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Reports",
+        "operationId": "reports_api_reports_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Reports Api Reports Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/{report_id}": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Report Detail",
+        "operationId": "report_detail_api_reports__report_id__get",
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Report Detail Api Reports  Report Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/{report_id}/export": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Export Report",
+        "operationId": "export_report_api_reports__report_id__export_get",
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -599,6 +840,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": true,
                   "type": "object",
                   "title": "Response Health Api System Health Get"
                 }
@@ -621,6 +863,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": true,
                   "type": "object",
                   "title": "Response Version Api System Version Get"
                 }
@@ -669,6 +912,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",
@@ -752,8 +1002,8 @@
             "type": "string"
           },
           "confidence": {
-            "maximum": 1.0,
-            "minimum": 0.0,
+            "maximum": 1,
+            "minimum": 0,
             "title": "Confidence",
             "type": "number"
           },
@@ -1084,14 +1334,14 @@
             "type": "array"
           },
           "score": {
-            "maximum": 1.0,
-            "minimum": 0.0,
+            "maximum": 1,
+            "minimum": 0,
             "title": "Score",
             "type": "number"
           },
           "completeness": {
-            "maximum": 1.0,
-            "minimum": 0.0,
+            "maximum": 1,
+            "minimum": 0,
             "title": "Completeness",
             "type": "number"
           },
@@ -1164,8 +1414,8 @@
             "type": "string"
           },
           "confidence": {
-            "maximum": 1.0,
-            "minimum": 0.0,
+            "maximum": 1,
+            "minimum": 0,
             "title": "Confidence",
             "type": "number"
           }
@@ -1257,8 +1507,8 @@
             "type": "string"
           },
           "score": {
-            "maximum": 1.0,
-            "minimum": 0.0,
+            "maximum": 1,
+            "minimum": 0,
             "title": "Score",
             "type": "number"
           },
@@ -1368,8 +1618,8 @@
             "type": "string"
           },
           "confidence": {
-            "maximum": 1.0,
-            "minimum": 0.0,
+            "maximum": 1,
+            "minimum": 0,
             "title": "Confidence",
             "type": "number"
           },
@@ -1395,6 +1645,7 @@
             "type": "array"
           },
           "feature_values": {
+            "additionalProperties": true,
             "title": "Feature Values",
             "type": "object"
           },
@@ -1481,6 +1732,7 @@
             "title": "Display Name"
           },
           "attributes": {
+            "additionalProperties": true,
             "title": "Attributes",
             "type": "object"
           },
@@ -1720,6 +1972,7 @@
           },
           "properties": {
             "type": "object",
+            "additionalProperties": true,
             "title": "Properties"
           },
           "first_seen": {
@@ -1825,11 +2078,12 @@
           },
           "properties": {
             "type": "object",
+            "additionalProperties": true,
             "title": "Properties"
           },
           "confidence": {
-            "maximum": 1.0,
-            "minimum": 0.0,
+            "maximum": 1,
+            "minimum": 0,
             "title": "Confidence",
             "type": "number"
           },
@@ -2014,7 +2268,7 @@
           "duration_ms": {
             "anyOf": [
               {
-                "minimum": 0.0,
+                "minimum": 0,
                 "type": "number"
               },
               {
@@ -2039,6 +2293,7 @@
           "dns": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -2051,6 +2306,7 @@
           "http": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -2063,6 +2319,7 @@
           "icmp": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -2256,6 +2513,7 @@
           "payload": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -2277,6 +2535,7 @@
             "type": "string"
           },
           "labels": {
+            "additionalProperties": true,
             "title": "Labels",
             "type": "object"
           }
@@ -2405,8 +2664,8 @@
             "type": "array"
           },
           "confidence": {
-            "maximum": 1.0,
-            "minimum": 0.0,
+            "maximum": 1,
+            "minimum": 0,
             "title": "Confidence",
             "type": "number"
           }
@@ -2516,8 +2775,8 @@
             "type": "string"
           },
           "score": {
-            "maximum": 1.0,
-            "minimum": 0.0,
+            "maximum": 1,
+            "minimum": 0,
             "title": "Score",
             "type": "number"
           },
@@ -2596,7 +2855,7 @@
           },
           "uncertainty_ms": {
             "default": 0,
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Uncertainty Ms",
             "type": "number"
           },
@@ -2623,6 +2882,7 @@
             "type": "string"
           },
           "input_summary": {
+            "additionalProperties": true,
             "title": "Input Summary",
             "type": "object"
           },
@@ -2762,6 +3022,7 @@
             "type": "array"
           },
           "extensions": {
+            "additionalProperties": true,
             "title": "Extensions",
             "type": "object"
           },

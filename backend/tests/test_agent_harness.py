@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+import httpx
 from pydantic import ValidationError
 
 from app.agents.harness import EvidenceValidator, Orchestrator, Tool, ToolGateway, default_agent_registry
@@ -110,6 +111,30 @@ def test_model_client_retries_one_invalid_json_response(monkeypatch):
     assert len(calls) == 2
 
 
+def test_model_client_adapts_unsupported_server_schema_to_local_strict_validation(monkeypatch):
+    calls = []
+    class Response:
+        def __init__(self, status):
+            self.status_code = status
+            self.text = '{"error":{"message":"This response_format type is unavailable now"}}' if status == 400 else ""
+        def raise_for_status(self):
+            if self.status_code == 400:
+                request = httpx.Request("POST", "https://model.example/v1/chat/completions")
+                raise httpx.HTTPStatusError("bad request", request=request, response=httpx.Response(400, request=request, text=self.text))
+        def json(self):
+            return {"choices": [{"message": {"content": '{"ok":true}'}}], "usage": {"prompt_tokens": 3, "completion_tokens": 2, "total_tokens": 5}}
+    def fake_post(*args, **kwargs):
+        calls.append(kwargs["json"])
+        return Response(400 if len(calls) == 1 else 200)
+    monkeypatch.setattr("app.agents.model.httpx.post", fake_post)
+    client = OpenAICompatibleModelClient("https://model.example/v1", "secret", "fake-model")
+    schema = {"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"], "additionalProperties": False}
+    assert client.complete_json("host", "1.0.0", {}, schema) == {"ok": True}
+    assert calls[0]["response_format"]["type"] == "json_schema"
+    assert calls[1]["response_format"]["type"] == "json_object"
+    assert client.last_usage()["total_tokens"] == 5
+
+
 class EchoDraftModel:
     configured = True
     def complete_json(self, role, prompt_version, payload, schema):
@@ -140,6 +165,23 @@ def test_coordinator_runs_parallel_specialists_and_persists_full_flow(tmp_path):
     assert by_role["attribution"]["result"]["artifact"]["status"] == "unable_to_attribute"
     assert by_role["attribution"]["result"]["artifact"]["candidates"][0]["candidate"] == "APT3 (G0022)"
     assert len(repo.list_reports()) == 2
+
+
+def test_quick_scope_reuses_real_agents_tools_and_validator_without_reports(tmp_path):
+    settings, repo, graph, chain = seeded(tmp_path)
+    service = InvestigationService(repo, graph, settings)
+    service.model = EchoDraftModel()
+    summary = service.investigate(chain.chain_id, scope="quick", max_steps=4)
+    records = [item for item in repo.list_agent_records(100) if item["task"]["case_id"] == summary["case_id"]]
+    assert summary["status"] == "succeeded"
+    assert summary["scope"] == "quick"
+    assert summary["report_ids"] == []
+    assert {item["task"]["agent_role"] for item in records} == {"coordinator", "host", "network", "correlation"}
+    assert all(item["runtime"]["scope"] == "quick" for item in records)
+    assert all(item["task"]["constraints"]["max_steps"] == 4 for item in records)
+    assert all(not item["result"]["runtime"]["fallback"] for item in records)
+    assert all(finding["evidence_ids"] for item in records for finding in item["result"]["result"]["findings"])
+    assert len(repo.list_reports()) == 0
 
 
 def test_model_failure_uses_deterministic_fallback_without_aborting(tmp_path):

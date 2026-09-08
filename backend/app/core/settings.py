@@ -23,7 +23,7 @@ class Settings(BaseModel):
     llm_base_url: str = os.getenv("LLM_BASE_URL", "")
     llm_api_key: str = os.getenv("LLM_API_KEY", "")
     llm_model: str = os.getenv("LLM_MODEL", "")
-    llm_timeout_seconds: float = float(os.getenv("LLM_TIMEOUT_SECONDS", "45"))
+    llm_timeout_seconds: float = float(os.getenv("LLM_TIMEOUT_SECONDS", "180"))
     report_dir: Path = Path(os.getenv("TRACEGUARD_REPORT_DIR", "data/reports"))
 
     def ensure_directories(self) -> None:

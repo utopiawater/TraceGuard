@@ -16,48 +16,54 @@ Windows Security / Sysmon XML + Auditd / Wazuh JSON + Zeek JSON
 
 ## 本地运行
 
-要求 Python 3.8+、Node.js 20+。Windows 推荐从项目根目录执行安装脚本；它只在当前进程内取消 `PIP_NO_INDEX` 并绕过失效的本地代理，不会持久修改系统设置：
+最终支持环境为 **Python 3.13（OpenSSL 3）** 与 Node.js 20+。不支持 Python 3.8；旧运行时在真实 DeepSeek HTTPS 调用中会出现 SSL EOF。Windows 从项目根目录安装：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\setup_windows.ps1
 ```
 
-然后执行：
+复制本地配置模板并填写 Neo4j 与 LLM 配置。`.env` 已被 Git ignore，API Key 不得写入其他文件：
 
 ```powershell
-python scripts/replay_scenario.py
-python scripts/replay_scenario.py --scenario backend/fixtures/scenarios/full_attack_chain --run-id run_full_multisource_001
-python scripts/export_schemas.py
-python scripts/export_openapi.py
-python -m uvicorn app.main:app --app-dir backend --reload
+Copy-Item .env.example .env
 ```
 
-若当前网络可以正常访问官方 PyPI，也可不用安装脚本，直接执行 `python -m pip install -e ".[dev]"`。
-
-另开终端：
+完成配置后使用固定端口一键启动和检查：
 
 ```powershell
-cd frontend
-npm install
-npm run generate:api
-npm run dev
+powershell -ExecutionPolicy Bypass -File .\scripts\start.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\check.ps1
 ```
 
-浏览器访问 `http://127.0.0.1:5173`，API 文档位于 `http://127.0.0.1:8000/docs`。
+Web 固定入口为 `http://127.0.0.1:5173`，API 文档为 `http://127.0.0.1:8000/docs`。停止服务：
 
-也可复制 `.env.example` 为 `.env`，修改本地 Neo4j 密码后执行 `docker compose up --build`，Web 入口为 `http://127.0.0.1:8080`。
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\stop.ps1
+```
+
+需要重新生成七阶段演示数据时，在服务停止状态执行：
+
+```powershell
+.\.venv\Scripts\python.exe scripts/replay_scenario.py --scenario backend/fixtures/scenarios/full_attack_chain --run-id run_full_multisource_001
+```
+
+Agent 调查中心保留两种调用范围：完整调查执行六个 Agent；快速调查执行 Coordinator、Host、Network、Correlation。两者共用真实 Tool、严格 Schema 和 EvidenceValidator；模型不可用时明确记录为 `deterministic_fallback`，不会伪装成 `real_llm`。
+
+Docker Compose 同样使用 Python 3.13 镜像；容器 Web 入口为 `http://127.0.0.1:8080`。
+
+完整安装、健康检查、Agent 演示与验收记录说明见 [Release Runbook](docs/12_release_runbook.md)。
 
 ## 验证
 
 ```powershell
-python scripts/self_check.py
-python -m pytest
+.\.venv\Scripts\python.exe scripts/self_check.py
+.\.venv\Scripts\python.exe -m pytest
 cd frontend
 npm run build
 ```
 
-`self_check.py` 不依赖 FastAPI/pytest，可在受限离线环境验证完整主管道、证据外键、图投影、幂等与 Agent 工具权限。完整 API 测试需要安装开发依赖。
+`self_check.py` 验证主管道、证据外键、图投影、幂等与 Agent 工具权限。普通自动化测试使用 Fake ModelClient，不消耗真实 LLM Token。正式真实模型验收记录保存在 `artifacts/release/`。
 
 ## 真实空状态
 
-Agent 执行、归因、公开数据集和报告生成器尚未填充时，API 返回空 `data` 与明确 `meta.warnings`；前端不会以 Mock 数据替代。Wazuh 与 Auditd 已进入统一主管道，Dataset Adapter 仍保留明确的未接入状态，留待下一阶段。
+公开数据集尚未接入时，API 返回空 `data` 与明确 `meta.warnings`；前端不会以 Mock 数据替代。Wazuh、Sysmon、Auditd、Zeek 已进入统一主管道，Dataset Adapter 保留明确的未接入状态。

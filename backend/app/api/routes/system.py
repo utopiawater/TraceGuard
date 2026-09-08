@@ -12,7 +12,17 @@ router = APIRouter(tags=["system"])
 def health(request: Request, repo: SQLiteRepository = Depends(repository)) -> dict:
     active = request.app.state.settings
     graph_status = request.app.state.graph.status() if hasattr(request.app.state.graph, "status") else {"configured": False, "connected": False, "backend": "memory"}
-    return response({"status": "ok", "version": __version__, "mode": active.mode, "storage": "sqlite", "graph": graph_status, "counts": repo.counts()})
+    llm_configured = bool(active.llm_base_url and active.llm_api_key and active.llm_model)
+    return response({
+        "status": "ok", "version": __version__, "mode": active.mode, "storage": "sqlite",
+        "graph": graph_status, "counts": repo.counts(),
+        "llm": {
+            "configured": llm_configured,
+            "execution_mode": "real_llm" if llm_configured else "deterministic_fallback",
+            "model": active.llm_model or None,
+            "timeout_seconds": active.llm_timeout_seconds,
+        },
+    })
 
 
 @router.get("/system/version")

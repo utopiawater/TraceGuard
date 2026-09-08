@@ -16,10 +16,13 @@ def _task_view(record: dict) -> dict:
     result_wrapper = record.get("result") or {}
     result = result_wrapper.get("result")
     status = result.get("status") if result else task["state"]
+    execution_mode = "pending" if not result else ("deterministic_fallback" if runtime.get("model_fallback", False) else "real_llm")
     return {
         **task, "status": status, "started_at": runtime.get("started_at"), "finished_at": runtime.get("finished_at"),
         "created_at": runtime.get("created_at"), "status_history": runtime.get("status_history", []),
+        "token_usage": runtime.get("token_usage", {}),
         "chain_id": runtime.get("chain_id"), "investigation_id": runtime.get("investigation_id"),
+        "scope": runtime.get("scope", "full"), "execution_mode": execution_mode,
         "model_fallback": runtime.get("model_fallback", False), "error": runtime.get("error"),
         "result": result, "artifact": result_wrapper.get("artifact", {}),
     }
@@ -40,10 +43,12 @@ def agents(repo: SQLiteRepository = Depends(repository)) -> dict:
         status = "failed" if statuses and all(item == "failed" for item in statuses) else ("partial" if any(item in {"failed", "partial"} for item in statuses) else ("running" if any(item in {"queued", "running"} for item in statuses) else "succeeded"))
         values.append({
             "case_id": case_id, "attack_chain": root.get("chain_id"), "status": status,
+            "scope": root.get("scope", "full"),
             "created_at": root.get("created_at") or root.get("started_at"),
             "started_at": root.get("started_at"), "finished_at": max([item.get("finished_at") or "" for item in tasks]) or None,
             "final_confidence": round(confidence, 4), "task_count": len(tasks),
             "model_fallback": any(item.get("model_fallback") for item in tasks),
+            "execution_mode": "pending" if any(item["status"] in {"queued", "running"} for item in tasks) else ("deterministic_fallback" if any(item.get("model_fallback") for item in tasks) else "real_llm"),
         })
     values.sort(key=lambda item: item.get("started_at") or "", reverse=True)
     warnings = [] if values else ["尚未接入 Agent 调查运行记录；请从攻击链页面选择已有链并开始调查。"]

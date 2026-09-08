@@ -2,7 +2,7 @@ import html
 import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Literal, Optional, Set, Tuple
 from uuid import uuid4
 
 from app.agents.harness import EvidenceValidator, default_agent_registry
@@ -32,41 +32,65 @@ class InvestigationService:
         )
         self._task_runtime: Dict[str, dict] = {}
 
-    def investigate(self, chain_id: str, case_id: Optional[str] = None) -> dict:
+    def investigate(
+        self,
+        chain_id: str,
+        case_id: Optional[str] = None,
+        scope: Literal["full", "quick"] = "full",
+        max_steps: int = 12,
+    ) -> dict:
         chain = self.repo.get_chain(chain_id)
         if not chain:
             raise ValueError("attack chain not found")
+        if scope not in {"full", "quick"}:
+            raise ValueError("unsupported investigation scope")
         case_id = case_id or "case_%s" % uuid4().hex[:16]
         created = utc_now().isoformat()
+        quick = scope == "quick"
 
-        coordinator = self._new_task(case_id, "coordinator", "为既有攻击链分解调查任务并监督执行状态", [chain_id], None)
-        self._queue(coordinator, chain_id, created)
-        coordinator_result, _ = self._guarded(coordinator, chain, self._run_coordinator)
+        coordinator = self._new_task(case_id, "coordinator", "为既有攻击链分解调查任务并监督执行状态", [chain_id], None, max_steps)
+        self._queue(coordinator, chain_id, created, scope)
+        coordinator_result, _ = self._guarded(coordinator, chain, self._run_coordinator, quick)
 
-        host = self._new_task(case_id, "host", "核查登录、用户、进程、文件、注册表、权限及内存证据", [chain_id], coordinator.task_id)
-        network = self._new_task(case_id, "network", "核查会话、Zeek、DNS、HTTP、ICMP、C2 与隐蔽信道证据", [chain_id], coordinator.task_id)
-        self._queue(host, chain_id, created)
-        self._queue(network, chain_id, created)
+        host = self._new_task(case_id, "host", "核查登录、用户、进程、文件、注册表、权限及内存证据", [chain_id], coordinator.task_id, max_steps)
+        network = self._new_task(case_id, "network", "核查会话、Zeek、DNS、HTTP、ICMP、C2 与隐蔽信道证据", [chain_id], coordinator.task_id, max_steps)
+        self._queue(host, chain_id, created, scope)
+        self._queue(network, chain_id, created, scope)
         with ThreadPoolExecutor(max_workers=2, thread_name_prefix="traceguard-agent") as executor:
-            host_future = executor.submit(self._guarded, host, chain, self._run_host)
-            network_future = executor.submit(self._guarded, network, chain, self._run_network)
+            host_future = executor.submit(self._guarded, host, chain, self._run_host, quick)
+            network_future = executor.submit(self._guarded, network, chain, self._run_network, quick)
             host_result, host_artifact = host_future.result()
             network_result, network_artifact = network_future.result()
 
-        correlation = self._new_task(case_id, "correlation", "审阅既有七阶段攻击链、关系路径、替代解释与证据缺口", [chain_id, host_result.result_id, network_result.result_id], coordinator.task_id)
-        self._queue(correlation, chain_id, created)
+        correlation = self._new_task(case_id, "correlation", "审阅既有七阶段攻击链、关系路径、替代解释与证据缺口", [chain_id, host_result.result_id, network_result.result_id], coordinator.task_id, max_steps)
+        self._queue(correlation, chain_id, created, scope)
         correlation_result, correlation_artifact = self._guarded(correlation, chain, self._run_correlation, host_result, network_result)
 
-        attribution = self._new_task(case_id, "attribution", "基于固定 ATT&CK 知识与已验证证据进行候选相似性分析", [chain_id, correlation_result.result_id], correlation.task_id)
-        self._queue(attribution, chain_id, created)
+        if quick:
+            return self._summary(
+                case_id, chain_id, created, scope,
+                [coordinator, host, network, correlation],
+                [coordinator_result, host_result, network_result, correlation_result],
+                [],
+            )
+
+        attribution = self._new_task(case_id, "attribution", "基于固定 ATT&CK 知识与已验证证据进行候选相似性分析", [chain_id, correlation_result.result_id], correlation.task_id, max_steps)
+        self._queue(attribution, chain_id, created, scope)
         attribution_result, attribution_artifact = self._guarded(attribution, chain, self._run_attribution)
 
-        report = self._new_task(case_id, "report", "仅使用已验证 Findings、攻击链、ATT&CK 与证据生成调查报告", [chain_id, host_result.result_id, network_result.result_id, correlation_result.result_id, attribution_result.result_id], attribution.task_id)
-        self._queue(report, chain_id, created)
+        report = self._new_task(case_id, "report", "仅使用已验证 Findings、攻击链、ATT&CK 与证据生成调查报告", [chain_id, host_result.result_id, network_result.result_id, correlation_result.result_id, attribution_result.result_id], attribution.task_id, max_steps)
+        self._queue(report, chain_id, created, scope)
         accepted = [host_result, network_result, correlation_result, attribution_result]
         report_result, report_artifact = self._guarded(report, chain, self._run_report, accepted, attribution_artifact)
 
         results = [coordinator_result, host_result, network_result, correlation_result, attribution_result, report_result]
+        return self._summary(
+            case_id, chain_id, created, scope,
+            [coordinator, host, network, correlation, attribution, report], results,
+            report_artifact.get("report_ids", []),
+        )
+
+    def _summary(self, case_id: str, chain_id: str, created: str, scope: str, tasks: List[AgentTask], results: List[AgentResult], report_ids: List[str]) -> dict:
         failed = [item for item in results if item.status == "failed"]
         partial = [item for item in results if item.status == "partial"]
         findings = [finding for result in results for finding in result.findings]
@@ -75,21 +99,20 @@ class InvestigationService:
             "case_id": case_id, "chain_id": chain_id,
             "status": "failed" if len(failed) == len(results) else ("partial" if failed or partial else "succeeded"),
             "created_at": created, "finished_at": utc_now().isoformat(), "final_confidence": confidence,
-            "task_ids": [item.task_id for item in [coordinator, host, network, correlation, attribution, report]],
-            "report_ids": report_artifact.get("report_ids", []),
+            "scope": scope, "task_ids": [item.task_id for item in tasks], "report_ids": report_ids,
             "model": {"configured": self.model.configured, "model": self.settings.llm_model or "deterministic-fallback"},
         }
 
-    def _new_task(self, case_id: str, role: str, objective: str, refs: List[str], parent: Optional[str]) -> AgentTask:
+    def _new_task(self, case_id: str, role: str, objective: str, refs: List[str], parent: Optional[str], max_steps: int) -> AgentTask:
         definition = self.registry.get(role)
         return AgentTask(
             task_id="task_%s" % uuid4().hex[:20], case_id=case_id, agent_role=role, objective=objective,
             input_refs=refs, allowed_tools=sorted(definition.allowed_tools),
-            constraints=AgentConstraints(max_steps=12, deadline_ms=60000, read_only=True), parent_task_id=parent, state="queued",
+            constraints=AgentConstraints(max_steps=max_steps, deadline_ms=60000, read_only=True), parent_task_id=parent, state="queued",
         )
 
-    def _queue(self, task: AgentTask, chain_id: str, created: str) -> None:
-        runtime = {"investigation_id": task.case_id, "chain_id": chain_id, "created_at": created, "status_history": [{"status": "queued", "at": created}]}
+    def _queue(self, task: AgentTask, chain_id: str, created: str, scope: str) -> None:
+        runtime = {"investigation_id": task.case_id, "chain_id": chain_id, "scope": scope, "created_at": created, "status_history": [{"status": "queued", "at": created}]}
         self._task_runtime[task.task_id] = runtime
         self.repo.put_agent_task(task, runtime)
 
@@ -128,15 +151,16 @@ class InvestigationService:
         return self.gateway.invoke(task, self.registry, name, arguments)
 
     def _finish(self, task: AgentTask, chain: AttackChain, draft: AgentResult, context: dict, artifact: Optional[dict] = None) -> AgentResult:
-        finished = utc_now().isoformat()
         evidence_ids = {item.evidence_id for item in self.repo.list_evidence(10000)}
-        used_fallback, fallback_message = False, None
+        used_fallback, fallback_message, token_usage = False, None, {}
         try:
             payload = self.model.complete_json(
                 task.agent_role, self.registry.get(task.agent_role).prompt_version,
                 {"instruction": "Refine the verified draft without changing identifiers or introducing facts.", "verified_context": context, "draft": draft.model_dump(mode="json")},
                 AgentResult.model_json_schema(),
             )
+            if hasattr(self.model, "last_usage"):
+                token_usage = self.model.last_usage()
             result = AgentResult.model_validate(payload)
             if result.task_id != task.task_id or result.result_id != draft.result_id:
                 raise ValueError("model changed immutable task/result identifiers")
@@ -157,13 +181,14 @@ class InvestigationService:
             errors = self.validator.validate(result, evidence_ids)
             if errors:
                 raise ValueError("deterministic result failed evidence validation: %s" % "; ".join(errors))
+        finished = utc_now().isoformat()
         completed = task.model_copy(update={"state": "succeeded" if result.status != "failed" else "failed"})
         runtime = dict(self._task_runtime.get(task.task_id, {"investigation_id": task.case_id, "chain_id": chain.chain_id, "created_at": finished, "status_history": []}))
-        runtime.update({"finished_at": finished, "model_fallback": used_fallback, "error": fallback_message})
+        runtime.update({"finished_at": finished, "model_fallback": used_fallback, "error": fallback_message, "token_usage": token_usage})
         runtime["status_history"] = list(runtime.get("status_history", [])) + [{"status": result.status, "at": finished}]
         self._task_runtime[task.task_id] = runtime
         self.repo.put_agent_task(completed, runtime)
-        self.repo.put_agent_result(result, artifact or {}, {"finished_at": finished, "fallback": used_fallback})
+        self.repo.put_agent_result(result, artifact or {}, {"finished_at": finished, "fallback": used_fallback, "token_usage": token_usage})
         return result
 
     def _draft(self, task: AgentTask, findings: List[AgentFinding], output_refs: Optional[List[str]] = None, status: str = "succeeded") -> AgentResult:
@@ -173,29 +198,29 @@ class InvestigationService:
             model_info=ModelInfo(provider="deterministic", model="fallback-v1", prompt_version=self.registry.get(task.agent_role).prompt_version),
         )
 
-    def _run_coordinator(self, task: AgentTask, chain: AttackChain) -> Tuple[AgentResult, dict]:
+    def _run_coordinator(self, task: AgentTask, chain: AttackChain, quick: bool = False) -> Tuple[AgentResult, dict]:
         running, _ = self._start(task, chain.chain_id)
         chain_data = self._invoke(running, "chain_lookup", {"chain_id": chain.chain_id})
         source_data = self._invoke(running, "source_health", {"limit": 50})
-        detection_data = self._invoke(running, "detection_lookup", {"ids": chain.detection_ids[:50]})
+        detection_data = self._invoke(running, "detection_lookup", {"ids": chain.detection_ids[:50]}) if not quick else {"detections": []}
         evidence = chain.evidence_ids[:50]
         findings = [AgentFinding(
             claim="已锁定既有攻击链并创建主机与网络并行调查分支；后续关联只审阅原有 %d 个步骤。" % len(chain.steps),
             confidence=chain.score, evidence_ids=evidence, alternatives=list(chain.uncertainties[:3]),
         )]
         draft = self._draft(running, findings, [chain.chain_id] + chain.detection_ids)
-        artifact = {"plan": ["host", "network", "correlation", "attribution", "report"]}
+        artifact = {"scope": "quick" if quick else "full", "plan": ["host", "network", "correlation"] if quick else ["host", "network", "correlation", "attribution", "report"]}
         return self._finish(running, chain, draft, {"chain": chain_data, "sources": source_data, "detections": detection_data}, artifact), artifact
 
-    def _run_host(self, task: AgentTask, chain: AttackChain) -> Tuple[AgentResult, dict]:
+    def _run_host(self, task: AgentTask, chain: AttackChain, quick: bool = False) -> Tuple[AgentResult, dict]:
         running, _ = self._start(task, chain.chain_id)
         detections = [item for item in self.repo.list_detections(5000) if item.run_id == chain.run_id and item.rule_id.startswith(HOST_RULE_PREFIXES)]
         detection_data = self._invoke(running, "detection_lookup", {"ids": [item.detection_id for item in detections]}) if detections else {"detections": []}
         actions = ["auth.", "process.", "file.", "registry.", "privilege.", "memory."]
-        event_data = self._invoke(running, "event_search", {"actions": actions, "limit": 200})
-        session_data = self._invoke(running, "session_lookup", {"session_type": "login", "limit": 100})
-        timeline_data = self._invoke(running, "entity_timeline", {"entity_id": chain.entity_ids[0], "limit": 100}) if chain.entity_ids else {"events": []}
-        graph_data = self._invoke(running, "graph_neighbors", {"entity_id": chain.entity_ids[0], "depth": 2, "limit": 100}) if chain.entity_ids else {"nodes": [], "edges": []}
+        event_data = self._invoke(running, "event_search", {"actions": actions, "limit": 60 if quick else 200})
+        session_data = {"sessions": [], "count": 0} if quick else self._invoke(running, "session_lookup", {"session_type": "login", "limit": 100})
+        timeline_data = {"events": []} if quick else (self._invoke(running, "entity_timeline", {"entity_id": chain.entity_ids[0], "limit": 100}) if chain.entity_ids else {"events": []})
+        graph_data = {"nodes": [], "edges": []} if quick else (self._invoke(running, "graph_neighbors", {"entity_id": chain.entity_ids[0], "depth": 2, "limit": 100}) if chain.entity_ids else {"nodes": [], "edges": []})
         evidence_ids = sorted({evidence for item in detections for evidence in item.evidence_ids})
         evidence_data = self._invoke(running, "evidence_get", {"ids": evidence_ids[:50]}) if evidence_ids else {"evidence": []}
         findings = [self._detection_finding(item) for item in detections]
@@ -204,13 +229,13 @@ class InvestigationService:
         result = self._finish(running, chain, draft, {"detections": detection_data, "events": event_data, "sessions": session_data, "timeline": timeline_data, "graph": graph_data, "evidence": evidence_data}, artifact)
         return result, artifact
 
-    def _run_network(self, task: AgentTask, chain: AttackChain) -> Tuple[AgentResult, dict]:
+    def _run_network(self, task: AgentTask, chain: AttackChain, quick: bool = False) -> Tuple[AgentResult, dict]:
         running, _ = self._start(task, chain.chain_id)
         detections = [item for item in self.repo.list_detections(5000) if item.run_id == chain.run_id and item.rule_id.startswith(NETWORK_RULE_PREFIXES)]
         detection_data = self._invoke(running, "detection_lookup", {"ids": [item.detection_id for item in detections]}) if detections else {"detections": []}
-        event_data = self._invoke(running, "event_search", {"actions": ["network.", "dns.", "http.", "icmp."], "source_kinds": ["zeek"], "limit": 200})
-        session_data = self._invoke(running, "session_lookup", {"session_type": "network", "limit": 100})
-        graph_data = self._invoke(running, "graph_neighbors", {"entity_id": chain.entity_ids[-1], "depth": 2, "limit": 100}) if chain.entity_ids else {"nodes": [], "edges": []}
+        event_data = self._invoke(running, "event_search", {"actions": ["network.", "dns.", "http.", "icmp."], "source_kinds": ["zeek"], "limit": 60 if quick else 200})
+        session_data = {"sessions": [], "count": 0} if quick else self._invoke(running, "session_lookup", {"session_type": "network", "limit": 100})
+        graph_data = {"nodes": [], "edges": []} if quick else (self._invoke(running, "graph_neighbors", {"entity_id": chain.entity_ids[-1], "depth": 2, "limit": 100}) if chain.entity_ids else {"nodes": [], "edges": []})
         evidence_ids = sorted({evidence for item in detections for evidence in item.evidence_ids})
         evidence_data = self._invoke(running, "evidence_get", {"ids": evidence_ids[:50]}) if evidence_ids else {"evidence": []}
         findings = [self._detection_finding(item) for item in detections]

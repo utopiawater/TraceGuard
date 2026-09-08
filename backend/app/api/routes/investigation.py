@@ -1,4 +1,5 @@
 from uuid import uuid4
+from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
@@ -35,12 +36,23 @@ def chain(chain_id: str, repo: SQLiteRepository = Depends(repository)) -> dict:
 
 
 @router.post("/chains/{chain_id}/investigate")
-def investigate_chain(chain_id: str, background: BackgroundTasks, repo: SQLiteRepository = Depends(repository), service: InvestigationService = Depends(investigation_service)) -> dict:
+def investigate_chain(
+    chain_id: str,
+    background: BackgroundTasks,
+    scope: Literal["full", "quick"] = Query(default="full"),
+    max_steps: int = Query(default=12, ge=4, le=12),
+    repo: SQLiteRepository = Depends(repository),
+    service: InvestigationService = Depends(investigation_service),
+) -> dict:
     if not repo.get_chain(chain_id):
         raise HTTPException(status_code=404, detail="attack chain not found")
     case_id = "case_%s" % uuid4().hex[:16]
-    background.add_task(service.investigate, chain_id, case_id)
-    return response({"case_id": case_id, "chain_id": chain_id, "status": "queued"})
+    background.add_task(service.investigate, chain_id, case_id, scope, max_steps)
+    return response({
+        "case_id": case_id, "chain_id": chain_id, "status": "queued", "scope": scope,
+        "max_steps": max_steps,
+        "execution_mode": "real_llm" if service.model.configured else "deterministic_fallback",
+    })
 
 
 @router.get("/graph")
