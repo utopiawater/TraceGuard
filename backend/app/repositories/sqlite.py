@@ -15,6 +15,14 @@ def _json(model: BaseModel) -> str:
     return model.model_dump_json()
 
 
+class _ClosingConnection(sqlite3.Connection):
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        try:
+            return super().__exit__(exc_type, exc_value, traceback)
+        finally:
+            self.close()
+
+
 class SQLiteRepository:
     def __init__(self, path: Path, migrations_dir: Optional[Path] = None) -> None:
         self.path = Path(path)
@@ -23,7 +31,7 @@ class SQLiteRepository:
         self.migrate()
 
     def connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(str(self.path))
+        connection = sqlite3.connect(str(self.path), factory=_ClosingConnection)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         return connection

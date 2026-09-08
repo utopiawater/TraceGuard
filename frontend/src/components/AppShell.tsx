@@ -1,23 +1,133 @@
-import { Activity, BellRing, Bot, Boxes, Braces, ChevronLeft, Database, FileText, Fingerprint, GitBranch, HardDrive, LayoutDashboard, Menu, Network, Radar, Search, ServerCog, ShieldCheck, X } from 'lucide-react'
-import { useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { Activity, BellRing, Bot, Boxes, Braces, ChevronDown, Database, FileText, Fingerprint, GitBranch, HardDrive, LayoutDashboard, Menu, Network, Radar, Search, ServerCog, ShieldCheck, X } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 
-const navigation = [
-  ['安全态势总览','/',LayoutDashboard], ['攻击事件中心','/incidents',BellRing], ['攻击链溯源','/chains',GitBranch],
-  ['安全知识图谱','/graph',Boxes], ['主机行为分析','/hosts',HardDrive], ['网络流量分析','/network',Network],
-  ['日志与安全事件','/events',Braces], ['Agent 调查中心','/agents',Bot], ['ATT&CK 分析','/attack',ShieldCheck],
-  ['威胁归因','/attribution',Fingerprint], ['数据源与资产','/sources',ServerCog], ['数据集实验','/datasets',Database], ['报告中心','/reports',FileText],
-] as const
+type NavItem = {
+  label: string
+  to: string
+  icon: LucideIcon
+  end?: boolean
+}
+
+type NavSection = NavItem | {
+  key: string
+  label: string
+  icon: LucideIcon
+  children: NavItem[]
+}
+
+const navigation: NavSection[] = [
+  { label: '安全态势总览', to: '/', icon: LayoutDashboard, end: true },
+  {
+    key: 'investigation',
+    label: '攻击调查',
+    icon: BellRing,
+    children: [
+      { label: '攻击事件中心', to: '/incidents', icon: BellRing },
+      { label: '攻击链溯源', to: '/chains', icon: GitBranch },
+      { label: 'Agent 调查中心', to: '/agents', icon: Bot },
+    ],
+  },
+  {
+    key: 'analytics',
+    label: '数据分析',
+    icon: Braces,
+    children: [
+      { label: '日志与安全事件', to: '/events', icon: Braces },
+      { label: '主机行为分析', to: '/hosts', icon: HardDrive },
+      { label: '网络流量分析', to: '/network', icon: Network },
+    ],
+  },
+  {
+    key: 'threat',
+    label: '威胁分析',
+    icon: ShieldCheck,
+    children: [
+      { label: '安全知识图谱', to: '/graph', icon: Boxes },
+      { label: 'ATT&CK 分析', to: '/attack', icon: ShieldCheck },
+      { label: '威胁归因', to: '/attribution', icon: Fingerprint },
+    ],
+  },
+  {
+    key: 'data',
+    label: '数据管理',
+    icon: Database,
+    children: [
+      { label: '数据源与资产', to: '/sources', icon: ServerCog },
+      { label: '数据集实验', to: '/datasets', icon: Database },
+    ],
+  },
+  { label: '报告中心', to: '/reports', icon: FileText },
+]
+
+function isGroup(section: NavSection): section is Extract<NavSection, { children: NavItem[] }> {
+  return 'children' in section
+}
+
+function isRouteActive(pathname: string, item: NavItem) {
+  return item.end ? pathname === item.to : pathname === item.to || pathname.startsWith(`${item.to}/`)
+}
+
+function activeGroupsFor(pathname: string) {
+  return new Set(
+    navigation
+      .filter(isGroup)
+      .filter(section => section.children.some(item => isRouteActive(pathname, item)))
+      .map(section => section.key),
+  )
+}
 
 export function AppShell() {
   const [open, setOpen] = useState(false)
+  const location = useLocation()
+  const [openGroups, setOpenGroups] = useState(() => activeGroupsFor(location.pathname))
   const { data: health, error: healthError } = useApi<{status:string;mode:'live'|'replay'|'snapshot'}>('/api/system/health')
+
+  useEffect(() => {
+    const activeGroups = activeGroupsFor(location.pathname)
+    setOpenGroups(previous => new Set([...previous, ...activeGroups]))
+  }, [location.pathname])
+
+  const toggleGroup = (key: string) => {
+    setOpenGroups(previous => {
+      const next = new Set(previous)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
   return <div className="app-shell">
     <button className="mobile-menu" aria-label="打开导航" onClick={() => setOpen(true)}><Menu /></button>
     <aside className={`sidebar ${open ? 'open' : ''}`}>
       <div className="brand"><span className="brand-mark"><Radar size={20} /></span><div><strong>TraceGuard</strong><small>证据驱动溯源</small></div><button aria-label="关闭导航" className="close-nav" onClick={() => setOpen(false)}><X /></button></div>
-      <nav aria-label="主要导航">{navigation.map(([label,to,Icon]) => <NavLink key={to} to={to} end={to === '/'} onClick={() => setOpen(false)}><Icon size={17} /><span>{label}</span></NavLink>)}</nav>
+      <nav className="sidebar-nav" aria-label="主要导航">
+        {navigation.map(section => {
+          if (!isGroup(section)) {
+            const Icon = section.icon
+            return <NavLink key={section.to} className="nav-root" to={section.to} end={section.end} onClick={() => setOpen(false)}><Icon size={17} /><span>{section.label}</span></NavLink>
+          }
+
+          const Icon = section.icon
+          const isOpen = openGroups.has(section.key)
+          const isActive = section.children.some(item => isRouteActive(location.pathname, item))
+          return <div key={section.key} className={`nav-group ${isOpen ? 'open' : ''} ${isActive ? 'active' : ''}`}>
+            <button type="button" className="nav-group-trigger" aria-expanded={isOpen} onClick={() => toggleGroup(section.key)}>
+              <Icon size={17} />
+              <span>{section.label}</span>
+              <ChevronDown className="nav-chevron" size={15} />
+            </button>
+            <div className="nav-group-children">
+              {section.children.map(item => {
+                const ChildIcon = item.icon
+                return <NavLink key={item.to} className="nav-child" to={item.to} onClick={() => setOpen(false)}><ChildIcon size={15} /><span>{item.label}</span></NavLink>
+              })}
+            </div>
+          </div>
+        })}
+      </nav>
       <div className="sidebar-foot"><span className={`status-dot ${healthError ? 'offline' : ''}`} />{healthError ? '分析节点不可用' : health ? '本地分析节点在线' : '正在检查分析节点'}<small>Schema 1.0 · ATT&CK 19.2</small></div>
     </aside>
     {open && <button className="scrim" aria-label="关闭导航" onClick={() => setOpen(false)} />}
