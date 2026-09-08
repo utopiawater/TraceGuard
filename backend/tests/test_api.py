@@ -44,6 +44,10 @@ def test_agent_attribution_and_report_resources_use_persisted_results(tmp_path):
         attribution = client.get("/api/attribution").json()["data"]
         assert attribution[0]["status"] == "candidate_analysis"
         assert {"group", "confidence", "matched_features"} <= set(attribution[0])
+        assert isinstance(attribution[0]["technique_overlap"], list)
+        assert isinstance(attribution[0]["c2_ioc_evidence"], list)
+        assert isinstance(attribution[0]["supporting_evidence"], list)
+        assert isinstance(attribution[0]["counter_evidence"], list)
         reports = client.get("/api/reports").json()["data"]
         assert {item["format"] for item in reports} == {"markdown", "html"}
         assert client.get(reports[0]["export_url"]).status_code == 200

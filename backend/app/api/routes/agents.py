@@ -81,7 +81,17 @@ def attribution(repo: SQLiteRepository = Depends(repository)) -> dict:
             "counter_evidence": artifact.get("counter_evidence", []), "confidence": artifact.get("confidence", 0),
         }]
         for candidate in candidates:
-            values.append({"case_id": view["case_id"], "chain_id": view["chain_id"], "status": artifact.get("status"), **candidate})
+            normalized = {
+                **candidate,
+                "candidate": candidate.get("candidate") or candidate.get("group") or artifact.get("label", "无法可靠归因"),
+                "similarity": candidate.get("similarity", 0),
+                "technique_overlap": candidate.get("technique_overlap") or [],
+                "c2_ioc_evidence": candidate.get("c2_ioc_evidence") or [],
+                "supporting_evidence": candidate.get("supporting_evidence") or [],
+                "counter_evidence": candidate.get("counter_evidence") or [],
+                "confidence": candidate.get("confidence", 0),
+            }
+            values.append({"case_id": view["case_id"], "chain_id": view["chain_id"], "status": artifact.get("status"), **normalized})
     return response(values, [] if values else ["尚无 Attribution Agent 的真实运行结果。"])
 
 
