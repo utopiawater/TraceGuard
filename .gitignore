@@ -113,6 +113,7 @@ data/reports/*
 
 datasets/*
 !datasets/README.md
+!datasets/sample_attack_dataset.json
 
 
 # ---------------------------------------------------------

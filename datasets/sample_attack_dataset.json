@@ -1,0 +1,45 @@
+{
+  "dataset_id": "sample_attack_dataset",
+  "records": [
+    {
+      "id": "replay-auth-4624",
+      "payload_format": "json",
+      "event_time_raw": "2026-09-07T08:00:00Z",
+      "source": {
+        "kind": "dataset",
+        "product": "TraceGuard Replay",
+        "dataset": "sample_attack_dataset",
+        "sensor_id": "replay-lab",
+        "host_hint": "win-client-01.corp.lab",
+        "source_record_id": "replay-auth-4624"
+      },
+      "payload": {
+        "ts": "2026-09-07T08:00:00Z",
+        "action": "auth.logon",
+        "user": "CORP\\student",
+        "host": "win-client-01.corp.lab",
+        "src_ip": "10.10.10.25"
+      }
+    },
+    {
+      "id": "replay-c2-conn",
+      "payload_format": "json",
+      "event_time_raw": "2026-09-07T08:00:12Z",
+      "source": {
+        "kind": "dataset",
+        "product": "TraceGuard Replay",
+        "dataset": "sample_attack_dataset",
+        "sensor_id": "replay-lab",
+        "host_hint": "win-client-01.corp.lab",
+        "source_record_id": "replay-c2-conn"
+      },
+      "payload": {
+        "ts": "2026-09-07T08:00:12Z",
+        "action": "network.connect",
+        "src_ip": "10.10.20.15",
+        "dst_ip": "203.0.113.77",
+        "dst_port": 443
+      }
+    }
+  ]
+}

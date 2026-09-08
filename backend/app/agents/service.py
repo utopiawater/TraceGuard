@@ -8,6 +8,7 @@ from uuid import uuid4
 from app.agents.harness import EvidenceValidator, default_agent_registry
 from app.agents.model import OpenAICompatibleModelClient
 from app.agents.tools import build_tool_gateway
+from app.attribution import AttackFingerprint, analyze_c2, rank_groups
 from app.contracts import AgentFinding, AgentResult, AgentTask, AttackChain, DetectionResult
 from app.contracts.agents import AgentConstraints, ModelInfo, StructuredError
 from app.core.ids import stable_id
@@ -268,27 +269,30 @@ class InvestigationService:
         chain_data = self._invoke(running, "chain_lookup", {"chain_id": chain.chain_id})
         attack_data = self._invoke(running, "attack_lookup", {"technique_ids": chain.technique_ids[:20]})
         evidence_data = self._invoke(running, "evidence_get", {"ids": chain.evidence_ids[:50]})
-        claim = "当前证据能够描述 ATT&CK TTP 与网络/主机行为，但没有足够独有 IOC 或工具指纹将事件可靠归因到具体组织。"
-        finding = AgentFinding(claim=claim, confidence=0.92, evidence_ids=chain.evidence_ids[:50], alternatives=["多个攻击组织及通用渗透工具均可能产生相同 TTP 组合"])
+        fingerprint = AttackFingerprint.from_chain(chain, self.repo)
+        c2_profiles = analyze_c2(fingerprint)
+        candidate_rows = rank_groups(fingerprint, c2_profiles, attack_data.get("groups", []))
+        claim = "已基于攻击工具、脚本模式、C2 基础设施与 ATT&CK TTP 生成 Top 3 归因候选；结果仍作为相似性分析，不等同于确认归因。"
+        finding = AgentFinding(claim=claim, confidence=0.82 if candidate_rows else 0.35, evidence_ids=chain.evidence_ids[:50], alternatives=["多个攻击组织及通用渗透工具均可能产生相同 TTP 组合"])
         draft = self._draft(running, [finding], [chain.chain_id] + chain.technique_ids)
-        candidate_rows = []
-        for group in attack_data.get("groups", []):
-            overlap = sorted(set(chain.technique_ids) & set(group.get("technique_ids", [])))
-            union = set(chain.technique_ids) | set(group.get("technique_ids", []))
-            similarity = round(len(overlap) / len(union), 4) if union else 0
-            candidate_rows.append({
-                "candidate": "%s (%s)" % (group["name"], group["group_id"]), "similarity": similarity,
-                "technique_overlap": overlap, "c2_ioc_evidence": [],
-                "supporting_evidence": sorted({e for step in chain.steps if step.technique_id in overlap for e in step.evidence_ids}),
-                "counter_evidence": ["只有通用 TTP 重合；没有该组织专属基础设施、恶意软件或行动指纹"],
-                "confidence": min(0.49, similarity),
-            })
         artifact = {
-            "status": "unable_to_attribute", "label": "无法可靠归因",
-            "candidates": sorted(candidate_rows, key=lambda item: item["similarity"], reverse=True)[:3], "technique_overlap": chain.technique_ids,
+            "status": "candidate_analysis", "label": "Top 3 归因候选",
+            "candidates": [
+                {
+                    **candidate,
+                    "candidate": "%s (%s)" % (candidate["group"], candidate.get("group_id")),
+                    "similarity": candidate["confidence"],
+                    "supporting_evidence": sorted({e for step in chain.steps if step.technique_id in candidate["technique_overlap"] for e in step.evidence_ids}),
+                    "counter_evidence": ["候选仅表示特征相似；仍缺少可唯一确认组织的专属证据"],
+                }
+                for candidate in candidate_rows
+            ],
+            "fingerprint": fingerprint.model_dump(mode="json"),
+            "c2_profiles": [profile.model_dump(mode="json") for profile in c2_profiles],
+            "technique_overlap": chain.technique_ids,
             "c2_ioc_evidence": chain.evidence_ids[:20], "supporting_evidence": chain.evidence_ids[:20],
-            "counter_evidence": ["缺少可唯一识别组织的基础设施归属、恶意软件家族或签名证据"],
-            "confidence": 0.92, "wording": "归因候选 / 相似性分析",
+            "counter_evidence": ["归因模块不把共享 TTP 或公共工具视为确认归因"],
+            "confidence": max([item["confidence"] for item in candidate_rows], default=0), "wording": "归因候选 / 相似性分析",
         }
         result = self._finish(running, chain, draft, {"chain": chain_data, "attack": attack_data, "evidence": evidence_data}, artifact)
         return result, artifact

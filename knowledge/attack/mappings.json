@@ -16,8 +16,68 @@
   "groups": {
     "G0022": {
       "name": "APT3",
+      "techniques": ["T1078", "T1059.001", "T1021", "T1053.005", "T1105"],
       "technique_ids": ["T1078", "T1059.001", "T1021", "T1053.005", "T1105"],
+      "tools": ["PowerShell", "PsExec"],
+      "malware": ["SHOTPUT", "CookieCutter"],
+      "c2_features": ["web_c2", "valid_accounts", "powershell"],
       "source": "https://attack.mitre.org/groups/G0022/"
+    },
+    "G0007": {
+      "name": "APT28",
+      "techniques": ["T1059.001", "T1071.001", "T1071.004", "T1021", "T1005", "T1041"],
+      "tools": ["PowerShell", "Mimikatz"],
+      "malware": ["X-Agent", "Zebrocy"],
+      "c2_features": ["dns_c2", "https_c2", "short_lived_domain"],
+      "source": "local://attack/mock/groups/APT28"
+    },
+    "G0016": {
+      "name": "APT29",
+      "techniques": ["T1078", "T1059.001", "T1071.001", "T1071.004", "T1005", "T1041"],
+      "tools": ["PowerShell", "curl"],
+      "malware": ["WellMess", "SUNBURST"],
+      "c2_features": ["https_c2", "domain_fronting_like", "low_noise_beacon", "backup-sync"],
+      "source": "local://attack/mock/groups/APT29"
+    },
+    "G0032": {
+      "name": "Lazarus",
+      "techniques": ["T1059.001", "T1071.001", "T1021", "T1055", "T1005", "T1041"],
+      "tools": ["PowerShell", "WMIC"],
+      "malware": ["Dtrack", "Manuscrypt"],
+      "c2_features": ["https_c2", "hardcoded_ip", "custom_tls"],
+      "source": "local://attack/mock/groups/Lazarus"
+    },
+    "G0046": {
+      "name": "FIN7",
+      "techniques": ["T1078", "T1059.001", "T1071.001", "T1055", "T1005"],
+      "tools": ["PowerShell", "SQLRat"],
+      "malware": ["Carbanak", "GRIFFON"],
+      "c2_features": ["web_c2", "encoded_powershell", "user_agent_reuse"],
+      "source": "local://attack/mock/groups/FIN7"
+    },
+    "G0010": {
+      "name": "Turla",
+      "techniques": ["T1071.001", "T1071.004", "T1095", "T1059.001", "T1005"],
+      "tools": ["PowerShell"],
+      "malware": ["Snake", "ComRAT"],
+      "c2_features": ["dns_c2", "icmp_tunnel", "multi_protocol_c2"],
+      "source": "local://attack/mock/groups/Turla"
+    },
+    "G0094": {
+      "name": "Kimsuky",
+      "techniques": ["T1078", "T1059.001", "T1071.001", "T1005", "T1041"],
+      "tools": ["PowerShell", "curl"],
+      "malware": ["BabyShark", "AppleSeed"],
+      "c2_features": ["https_c2", "scripted_collection", "cloud_like_domain"],
+      "source": "local://attack/mock/groups/Kimsuky"
+    },
+    "G0129": {
+      "name": "Mustang Panda",
+      "techniques": ["T1059.001", "T1071.001", "T1021", "T1005", "T1041"],
+      "tools": ["PowerShell", "archiver"],
+      "malware": ["PlugX", "TONEINS"],
+      "c2_features": ["https_c2", "archive_exfiltration", "regional_infrastructure"],
+      "source": "local://attack/mock/groups/MustangPanda"
     }
   },
   "software": {

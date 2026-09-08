@@ -41,7 +41,9 @@ def test_agent_attribution_and_report_resources_use_persisted_results(tmp_path):
         agents = client.get("/api/agents").json()["data"]
         assert agents[0]["case_id"] == case_id
         assert client.get("/api/agents/%s" % case_id).json()["data"]["tasks"][-1]["agent_role"] == "report"
-        assert client.get("/api/attribution").json()["data"][0]["status"] == "unable_to_attribute"
+        attribution = client.get("/api/attribution").json()["data"]
+        assert attribution[0]["status"] == "candidate_analysis"
+        assert {"group", "confidence", "matched_features"} <= set(attribution[0])
         reports = client.get("/api/reports").json()["data"]
         assert {item["format"] for item in reports} == {"markdown", "html"}
         assert client.get(reports[0]["export_url"]).status_code == 200

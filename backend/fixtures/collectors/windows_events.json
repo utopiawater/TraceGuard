@@ -1,0 +1,90 @@
+[
+  {
+    "channel": "Security",
+    "provider": "Microsoft-Windows-Security-Auditing",
+    "event_id": 4624,
+    "record_id": "security-4624-1",
+    "time_created": "2026-09-07T08:00:00Z",
+    "computer": "win-client-01.corp.lab",
+    "event_data": {
+      "TargetUserSid": "S-1-5-21-1000-1000-1000-1105",
+      "TargetUserName": "student",
+      "TargetDomainName": "CORP",
+      "TargetLogonId": "0x8A91C",
+      "LogonType": "10",
+      "IpAddress": "10.10.10.25",
+      "IpPort": "51842"
+    }
+  },
+  {
+    "channel": "Security",
+    "provider": "Microsoft-Windows-Security-Auditing",
+    "event_id": 4625,
+    "record_id": "security-4625-1",
+    "time_created": "2026-09-07T08:00:05Z",
+    "computer": "win-client-01.corp.lab",
+    "event_data": {
+      "TargetUserSid": "S-1-0-0",
+      "TargetUserName": "svc-backup",
+      "TargetDomainName": "CORP",
+      "TargetLogonId": "0x0",
+      "LogonType": "3",
+      "IpAddress": "10.10.10.99",
+      "Status": "0xC000006D"
+    }
+  },
+  {
+    "channel": "Security",
+    "provider": "Microsoft-Windows-Security-Auditing",
+    "event_id": 4688,
+    "record_id": "security-4688-1",
+    "time_created": "2026-09-07T08:00:07Z",
+    "computer": "win-client-01.corp.lab",
+    "event_data": {
+      "SubjectUserName": "student",
+      "NewProcessName": "C:\\Windows\\System32\\cmd.exe",
+      "ProcessCommandLine": "cmd.exe /c whoami",
+      "ParentProcessName": "C:\\Windows\\explorer.exe"
+    }
+  },
+  {
+    "channel": "Sysmon/Operational",
+    "provider": "Microsoft-Windows-Sysmon",
+    "event_id": 1,
+    "record_id": "sysmon-1-1",
+    "time_created": "2026-09-07T08:00:10Z",
+    "computer": "win-client-01.corp.lab",
+    "event_data": {
+      "UtcTime": "2026-09-07 08:00:10.000",
+      "ProcessGuid": "{C5B9A8A4-5C01-68BD-7100-000000000900}",
+      "ProcessId": "4240",
+      "Image": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "CommandLine": "powershell.exe -NoProfile -EncodedCommand SQBFAFgA",
+      "User": "CORP\\student",
+      "ParentProcessGuid": "{C5B9A8A4-5BFE-68BD-7000-000000000900}",
+      "ParentProcessId": "3896",
+      "ParentImage": "C:\\Windows\\System32\\cmd.exe"
+    }
+  },
+  {
+    "channel": "Sysmon/Operational",
+    "provider": "Microsoft-Windows-Sysmon",
+    "event_id": 3,
+    "record_id": "sysmon-3-1",
+    "time_created": "2026-09-07T08:00:12Z",
+    "computer": "win-client-01.corp.lab",
+    "event_data": {
+      "UtcTime": "2026-09-07 08:00:12.000",
+      "ProcessGuid": "{C5B9A8A4-5C01-68BD-7100-000000000900}",
+      "ProcessId": "4240",
+      "Image": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "User": "CORP\\student",
+      "Protocol": "tcp",
+      "Initiated": "true",
+      "SourceIp": "10.10.20.15",
+      "SourcePort": "51422",
+      "DestinationIp": "203.0.113.77",
+      "DestinationPort": "443"
+    }
+  }
+]

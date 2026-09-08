@@ -162,8 +162,9 @@ def test_coordinator_runs_parallel_specialists_and_persists_full_flow(tmp_path):
     assert {call["tool"] for call in by_role["host"]["result"]["result"]["tool_calls"]} >= {"event_search", "entity_timeline", "detection_lookup", "evidence_get"}
     assert {call["tool"] for call in by_role["network"]["result"]["result"]["tool_calls"]} >= {"event_search", "session_lookup", "detection_lookup", "evidence_get"}
     assert by_role["correlation"]["result"]["artifact"]["chain_valid"] is True
-    assert by_role["attribution"]["result"]["artifact"]["status"] == "unable_to_attribute"
-    assert by_role["attribution"]["result"]["artifact"]["candidates"][0]["candidate"] == "APT3 (G0022)"
+    assert by_role["attribution"]["result"]["artifact"]["status"] == "candidate_analysis"
+    assert len(by_role["attribution"]["result"]["artifact"]["candidates"]) == 3
+    assert {"group", "confidence", "matched_features"} <= set(by_role["attribution"]["result"]["artifact"]["candidates"][0])
     assert len(repo.list_reports()) == 2
 
 

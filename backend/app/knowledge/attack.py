@@ -30,7 +30,18 @@ class MappingFileProvider:
         return self._techniques.get(technique_id, {"technique_id": technique_id, "name": "Unknown", "attack_version": self.version})
 
     def groups(self) -> List[dict]:
-        return [dict({"group_id": key}, **value) for key, value in self._groups.items()]
+        values = []
+        for key, value in self._groups.items():
+            row = dict({"group_id": key}, **value)
+            if "technique_ids" not in row:
+                row["technique_ids"] = row.get("techniques", [])
+            if "techniques" not in row:
+                row["techniques"] = row.get("technique_ids", [])
+            row.setdefault("tools", [])
+            row.setdefault("malware", [])
+            row.setdefault("c2_features", [])
+            values.append(row)
+        return values
 
     def software(self) -> List[dict]:
         return [dict({"software_id": key}, **value) for key, value in self._software.items()]
