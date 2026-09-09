@@ -1,5 +1,4 @@
 import argparse
-import ast
 import json
 import re
 import sys
@@ -14,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
 from app.analysis.service import AnalysisTaskService
+from app.analysis.manifest import environment_policy, read_manifest_file
 from app.collectors import envelope_from_payload
 from app.contracts import SourceDescriptor
 from app.contracts.common import SourceKind
@@ -26,49 +26,8 @@ from app.normalizers.base import AdapterError
 SUPPORTED_SUFFIXES = {".json", ".jsonl", ".ndjson", ".xml", ".log", ".pcap", ".evtx"}
 
 
-def scalar(value: str) -> Any:
-    value = value.strip()
-    if not value:
-        return None
-    if value.startswith("[") and value.endswith("]"):
-        try:
-            return ast.literal_eval(value)
-        except Exception:
-            return value
-    return value.strip("'\"")
-
-
 def read_manifest(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        return {"missing": True, "nodes": []}
-    if path.suffix.lower() == ".json":
-        return json.loads(path.read_text(encoding="utf-8"))
-    data: dict[str, Any] = {"nodes": []}
-    section = None
-    current_node: dict[str, Any] | None = None
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        if not raw_line.strip() or raw_line.lstrip().startswith("#"):
-            continue
-        if not raw_line.startswith(" "):
-            key, _, value = raw_line.partition(":")
-            section = key.strip()
-            if value.strip():
-                data[section] = scalar(value)
-            elif section == "nodes":
-                data.setdefault("nodes", [])
-            continue
-        stripped = raw_line.strip()
-        if section == "nodes" and stripped.startswith("- "):
-            current_node = {}
-            data.setdefault("nodes", []).append(current_node)
-            stripped = stripped[2:].strip()
-            if stripped:
-                key, _, value = stripped.partition(":")
-                current_node[key.strip()] = scalar(value)
-        elif section == "nodes" and current_node is not None and ":" in stripped:
-            key, _, value = stripped.partition(":")
-            current_node[key.strip()] = scalar(value)
-    return data
+    return read_manifest_file(path)
 
 
 def classify(path: Path, service: AnalysisTaskService | None = None) -> str:
@@ -138,7 +97,7 @@ def count_records(path: Path, source_kind: str) -> tuple[int, int]:
     return 0, len(rows)
 
 
-def count_via_analysis_service(path: Path, service: AnalysisTaskService, registry: NormalizerRegistry) -> tuple[int, int, int, list[str]]:
+def count_via_analysis_service(path: Path, service: AnalysisTaskService, registry: NormalizerRegistry, policy: dict[str, Any] | None = None) -> tuple[int, int, int, list[str]]:
     recognized = service._recognize(path)
     if recognized.parser_status == "missing_parser":
         return 0, 0, 0, ["missing parser for %s" % recognized.kind]
@@ -162,20 +121,23 @@ def count_via_analysis_service(path: Path, service: AnalysisTaskService, registr
         kind = service._windows_kind_from_xml(payload, recognized.source_kind)
         event_time_raw = service._event_time(payload)
         try:
-            observed = parse_timestamp(event_time_raw) if event_time_raw is not None else parse_timestamp(0)
+            policy = policy or {}
+            observed = parse_timestamp(event_time_raw, policy.get("default_timezone")) if event_time_raw is not None else parse_timestamp(0)
+            aliases = policy.get("asset_aliases")
+            path_hint = service._host_hint_from_path(path, aliases if isinstance(aliases, dict) else None)
             host_hint = service._host_hint(payload)
             if host_hint and host_hint.lower() in {"localhost", "."}:
-                host_hint = service._host_hint_from_path(path) or host_hint
+                host_hint = path_hint or host_hint
             source = SourceDescriptor(
                 kind=kind,
                 product="dry-run",
                 dataset=dataset,
                 sensor_id=service._sensor_id(path, payload, kind),
-                host_hint=host_hint or service._host_hint_from_path(path),
+                host_hint=host_hint or path_hint,
                 source_record_id="%s:%d" % (path.name, index),
             )
             payload_format = "json" if recognized.payload_format == "pcap_ref" else "xml" if recognized.payload_format == "evtx" else recognized.payload_format
-            raw = envelope_from_payload(source, payload, payload_format, event_time_raw, "dry-run://%s#%d" % (path, index), observed, {"dry_run": True})
+            raw = envelope_from_payload(source, payload, payload_format, event_time_raw, "dry-run://%s#%d" % (path, index), observed, {"dry_run": True, **policy})
             normalized += len(registry.normalize(raw))
         except (AdapterError, ValueError, TypeError) as exc:
             failed += 1
@@ -222,8 +184,12 @@ def main() -> int:
         bundle = input_bundle
         archive_warnings = []
     manifest_path = bundle / args.manifest
+    if not manifest_path.exists():
+        manifest_path = next((bundle / name for name in ("traceguard_manifest.json", "manifest.json", "traceguard_manifest.yaml", "traceguard_manifest.yml", "manifest.yml") if (bundle / name).exists()), manifest_path)
     manifest = read_manifest(manifest_path)
-    files = [path for path in bundle.rglob("*") if path.is_file() and path.suffix.lower() in SUPPORTED_SUFFIXES and path.name != Path(args.manifest).name]
+    policy = environment_policy(manifest)
+    manifest_names = {"traceguard_manifest.json", "manifest.json", "traceguard_manifest.yaml", "traceguard_manifest.yml", "manifest.yaml", "manifest.yml"}
+    files = [path for path in bundle.rglob("*") if path.is_file() and path.suffix.lower() in SUPPORTED_SUFFIXES and path.name not in manifest_names]
     registry = build_registry()
     source_counts: Counter[str] = Counter()
     file_reports = []
@@ -232,7 +198,7 @@ def main() -> int:
     for path in files:
         recognized = service._recognize(path)
         source_kind = classify(path, service)
-        parseable, failed, normalized, errors = count_via_analysis_service(path, service, registry)
+        parseable, failed, normalized, errors = count_via_analysis_service(path, service, registry, policy)
         source_counts[source_kind] += parseable
         times = extract_times(path)
         all_times.extend(times)
@@ -280,7 +246,8 @@ def main() -> int:
         "bundle": str(input_bundle),
         "scenario_id": manifest.get("scenario_id"),
         "run_id": manifest.get("run_id"),
-        "timezone": manifest.get("timezone"),
+        "timezone": manifest.get("default_timezone") or manifest.get("timezone"),
+        "policy": policy,
         "nodes": nodes,
         "node_count": len(nodes),
         "files": file_reports,

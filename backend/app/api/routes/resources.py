@@ -2,7 +2,7 @@ from pathlib import Path
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from app.api.dependencies import graph, repository
 from app.api.envelope import response
@@ -22,16 +22,16 @@ def entities(run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repo
     if not run_id:
         return response([item.model_dump(mode="json") for item in projector.entities.values()])
     allowed_ids = set()
-    for event in repo.query_events(run_id=run_id, limit=50000):
+    for event in repo.all_events(run_id=run_id):
         for ref in (event.host, event.actor.user, event.actor.process, event.actor.parent_process, event.object.ref):
             if ref:
                 allowed_ids.add(ref.entity_id)
         if event.network:
             allowed_ids.update({value for value in (event.network.src.host_id, event.network.dst.host_id) if value})
-    for detection in repo.list_detections(50000, run_id=run_id):
+    for detection in repo.all_detections(run_id=run_id):
         allowed_ids.update(detection.entity_ids)
         allowed_ids.update({mapping.subtechnique_id or mapping.technique_id for mapping in detection.attack_mappings})
-    for chain in repo.list_chains(50000, run_id=run_id):
+    for chain in repo.all_chains(run_id=run_id):
         allowed_ids.update(chain.entity_ids)
         allowed_ids.update(chain.technique_ids)
     return response([item.model_dump(mode="json") for item in projector.entities.values() if item.entity_id in allowed_ids])
@@ -40,7 +40,7 @@ def entities(run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repo
 @router.get("/hosts")
 def hosts(run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository)) -> dict:
     seen = {}
-    for event in repo.query_events(run_id=run_id, limit=50000):
+    for event in repo.all_events(run_id=run_id):
         if event.host:
             item = seen.setdefault(event.host.entity_id, {"host_id": event.host.entity_id, "hostname": event.host.display_name, "last_seen": event.event_time.isoformat(), "logins": 0, "process": 0, "file": 0, "registry": 0, "privilege": 0, "memory": 0})
             item["last_seen"] = max(item["last_seen"], event.event_time.isoformat())
@@ -54,30 +54,38 @@ def hosts(run_id: Optional[str] = None, repo: SQLiteRepository = Depends(reposit
     return response(list(seen.values()))
 
 
+NETWORK_ACTIONS = ["network.", "http.", "dns.", "icmp."]
+
+
 @router.get("/network")
-def network(run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository)) -> dict:
+def network(limit: int = Query(default=100, ge=1, le=500), offset: int = Query(default=0, ge=0), run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository)) -> dict:
     values = [{
         "event_id": item.event_id, "event_time": item.event_time.isoformat(), "source": item.source.kind.value,
         "action": item.action, "transport": item.network.transport, "application": item.network.application,
         "src": "%s:%s" % (item.network.src.ip or item.network.src.host_id or "?", item.network.src.port if item.network.src.port is not None else "?"),
         "dst": "%s:%s" % (item.network.dst.ip or item.network.dst.host_id or "?", item.network.dst.port if item.network.dst.port is not None else "?"),
         "bytes_sent": item.network.bytes_sent, "session_id": item.network.session_id, "message": item.message,
-    } for item in repo.query_events(run_id=run_id, limit=50000) if item.network]
-    return response(values)
+    } for item in repo.query_events(run_id=run_id, limit=limit, offset=offset, actions=NETWORK_ACTIONS, descending=True) if item.network]
+    return response(values, total=repo.count_events(run_id=run_id, actions=NETWORK_ACTIONS))
 
 
 @router.get("/attack")
 def attack(run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository)) -> dict:
     coverage = {}
     attack_knowledge = MappingFileProvider(Path(__file__).parents[4] / "knowledge" / "attack" / "mappings.json")
-    for detection in repo.list_detections(50000, run_id=run_id):
+    for detection in repo.all_detections(run_id=run_id):
         for mapping in detection.attack_mappings:
             key = mapping.subtechnique_id or mapping.technique_id
             technique = attack_knowledge.technique(key)
-            item = coverage.setdefault(key, {"technique_id": key, "technique_name": technique.get("name", "Unknown"), "detection_count": 0, "evidence_count": 0, "attack_version": mapping.attack_version})
+            item = coverage.setdefault(key, {"technique_id": key, "technique_name": technique.get("name", "Unknown"), "detection_count": 0, "evidence_ids": set(), "attack_version": mapping.attack_version})
             item["detection_count"] += 1
-            item["evidence_count"] += len(detection.evidence_ids)
-    return response(list(coverage.values()))
+            item["evidence_ids"].update(detection.evidence_ids)
+    rows = []
+    for item in coverage.values():
+        evidence_ids = item.pop("evidence_ids")
+        item["evidence_count"] = len(evidence_ids)
+        rows.append(item)
+    return response(rows)
 
 
 @router.get("/datasets")
@@ -120,7 +128,7 @@ def datasets(request: Request) -> dict:
 
 @router.get("/sources")
 def sources(run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository)) -> dict:
-    events = repo.query_events(run_id=run_id, limit=50000)
+    events = repo.all_events(run_id=run_id)
     values = {}
     for event in events:
         values[event.source.sensor_id] = {"sensor_id": event.source.sensor_id, "kind": event.source.kind.value, "dataset": event.source.dataset, "last_event_time": event.event_time.isoformat(), "status": "ingested"}

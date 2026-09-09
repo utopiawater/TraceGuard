@@ -17,6 +17,7 @@ from app.bootstrap import build_pipeline
 from app.collectors import envelope_from_payload
 from app.contracts import RawEventEnvelope, SourceDescriptor
 from app.contracts.common import SourceKind
+from app.analysis.manifest import environment_policy, read_manifest_file
 from app.core.ids import stable_id
 from app.core.time import parse_timestamp, utc_now
 from app.repositories import SQLiteRepository
@@ -46,7 +47,7 @@ STAGES = [
     ("chains", "攻击链构建"),
     ("attack", "ATT&CK 映射"),
     ("ready_for_agent", "可启动 Agent 调查"),
-    ("completed", "报告就绪"),
+    ("completed", "基础分析完成"),
 ]
 
 
@@ -180,14 +181,33 @@ class AnalysisTaskService:
         return json.loads(path.read_text(encoding="utf-8"))
 
     def list(self) -> List[dict]:
-        tasks = []
+        tasks_by_id = {}
         for path in self.root.glob("analysis_*/task.json"):
             try:
                 task = json.loads(path.read_text(encoding="utf-8"))
-                tasks.append({key: task.get(key) for key in ("task_id", "status", "current_stage", "created_at", "updated_at", "upload", "result")})
+                tasks_by_id[task["task_id"]] = {key: task.get(key) for key in ("task_id", "status", "current_stage", "created_at", "updated_at", "upload", "result")}
             except (OSError, json.JSONDecodeError):
                 continue
-        return sorted(tasks, key=lambda item: item.get("created_at") or "", reverse=True)
+        for run in self.repository.list_runs(200):
+            run_id = run.get("run_id")
+            if not run_id or run_id in tasks_by_id:
+                continue
+            try:
+                manifest = json.loads(run.get("input_manifest_json") or "{}")
+            except (TypeError, json.JSONDecodeError):
+                manifest = {}
+            tasks_by_id[run_id] = {
+                "task_id": run_id,
+                "status": run.get("status"),
+                "current_stage": "completed" if run.get("status") == "completed" else run.get("status"),
+                "created_at": run.get("started_at"),
+                "updated_at": run.get("completed_at") or run.get("started_at"),
+                "upload": {"filename": manifest.get("source") or manifest.get("dataset_name") or manifest.get("scenario_id") or run_id, "size": None},
+                "result": None,
+                "source": "sqlite_runs",
+                "mode": run.get("mode"),
+            }
+        return sorted(tasks_by_id.values(), key=lambda item: item.get("created_at") or "", reverse=True)
 
     def result(self, task_id: str) -> dict:
         task = self.get(task_id)
@@ -299,10 +319,12 @@ class AnalysisTaskService:
                 default_tz = (task.get("policy") or {}).get("default_timezone")
                 observed = parse_timestamp(event_time_raw, default_tz) if event_time_raw is not None else utc_now()
                 record_id = "%s:%s:%d" % (task["task_id"], path.name, index)
+                aliases = (task.get("policy") or {}).get("asset_aliases")
+                path_hint = self._host_hint_from_path(path, aliases if isinstance(aliases, dict) else None)
                 host_hint = self._host_hint(payload)
                 if host_hint and host_hint.lower() in {"localhost", "."}:
-                    host_hint = self._host_hint_from_path(path) or host_hint
-                source = SourceDescriptor(kind=record_kind, product=self._product(record_kind, record_dataset), dataset=record_dataset, sensor_id=self._sensor_id(path, payload, record_kind), host_hint=host_hint or self._host_hint_from_path(path), source_record_id=record_id)
+                    host_hint = path_hint or host_hint
+                source = SourceDescriptor(kind=record_kind, product=self._product(record_kind, record_dataset), dataset=record_dataset, sensor_id=self._sensor_id(path, payload, record_kind), host_hint=host_hint or path_hint, source_record_id=record_id)
                 payload_format = "json" if item["payload_format"] == "pcap_ref" else "xml" if item["payload_format"] == "evtx" else item["payload_format"]
                 labels = {"analysis_task_id": task["task_id"], "uploaded_file": task["upload"]["filename"], **(task.get("policy") or {})}
                 raws.append(envelope_from_payload(source, payload, payload_format, event_time_raw, "analysis://%s/%s#%d" % (task["task_id"], item["path"], index), observed, labels))
@@ -444,18 +466,16 @@ class AnalysisTaskService:
 
     def _load_manifest_policy(self, task_dir: Path) -> dict:
         policy: dict = {}
-        for name in ("traceguard_manifest.json", "manifest.json"):
+        for name in ("traceguard_manifest.json", "manifest.json", "traceguard_manifest.yaml", "traceguard_manifest.yml", "manifest.yaml", "manifest.yml"):
             for root in (task_dir / "extracted", task_dir / "upload"):
                 path = root / name
                 if not path.is_file():
                     continue
                 try:
-                    manifest = json.loads(path.read_text(encoding="utf-8"))
+                    manifest = read_manifest_file(path)
                 except (OSError, json.JSONDecodeError):
                     continue
-                for key in ("default_timezone", "asset_aliases", "sensitive_path_patterns"):
-                    if key in manifest:
-                        policy[key] = manifest[key]
+                policy.update(environment_policy(manifest))
         return policy
 
     @contextmanager
@@ -490,7 +510,7 @@ class AnalysisTaskService:
             yield match.group(0)
 
     def _result_summary(self, task_id: str, result) -> dict:
-        events = self.repository.query_events(run_id=task_id, limit=50000)
+        events = self.repository.all_events(run_id=task_id)
         network = [event for event in events if event.network]
         high = [item for item in result.detections if item.severity in {"high", "critical"}]
         techniques = sorted({mapping.subtechnique_id or mapping.technique_id for det in result.detections for mapping in det.attack_mappings})
@@ -512,7 +532,7 @@ class AnalysisTaskService:
 
     def _stage_views(self, current: str) -> List[dict]:
         current_index = next((index for index, (key, _) in enumerate(STAGES) if key == current), 0)
-        return [{"key": key, "label": label, "status": "completed" if index < current_index else "running" if index == current_index else "pending"} for index, (key, label) in enumerate(STAGES)]
+        return [{"key": key, "label": label, "status": "completed" if index < current_index or (current == "completed" and index == current_index) else "running" if index == current_index else "pending"} for index, (key, label) in enumerate(STAGES)]
 
     @staticmethod
     def _suffix(name: str) -> str:
@@ -600,7 +620,15 @@ class AnalysisTaskService:
         return None
 
     @staticmethod
-    def _host_hint_from_path(path: Path) -> Optional[str]:
+    def _host_hint_from_path(path: Path, aliases: Optional[dict[str, str]] = None) -> Optional[str]:
+        normalized = "/".join(part.lower() for part in path.parts)
+        if aliases:
+            normalized_stem = path.stem.lower()
+            for alias in sorted((str(item).strip().lower().replace("\\", "/").strip("/") for item in aliases), key=len, reverse=True):
+                if not alias:
+                    continue
+                if normalized_stem == alias or normalized.endswith("/" + alias) or f"/{alias}/" in normalized or f"/{alias}." in normalized:
+                    return alias
         name = path.stem.lower()
         if name.startswith("n7_"):
             return "n7-office"

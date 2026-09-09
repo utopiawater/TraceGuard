@@ -31,6 +31,19 @@ type ReadyAnalysisTask = AnalysisTask & {
   identification:{found:FoundFile[];unsupported:{path:string;reason:string}[];warnings:string[]}
 }
 
+const analysisStatusName: Record<string, string> = {
+  uploaded: '已上传',
+  identified: '已识别',
+  running: '分析中',
+  failed: '失败',
+  completed: '溯源分析完成，可启动 Agent 调查',
+}
+const stageStatusName: Record<Stage['status'], string> = {
+  pending: '待执行',
+  running: '进行中',
+  completed: '已完成',
+}
+
 function normalizeAnalysisTask(task: AnalysisTask | null | undefined): ReadyAnalysisTask | null {
   if (!task?.task_id) return null
   const status = task.status ?? 'uploaded'
@@ -122,11 +135,11 @@ export function OnlineAnalysisPage() {
     if (file) void upload(file)
   }
 
-  return <><PageHeader title="分析任务" description="新建任务、上传证据包或选择数据源，TraceGuard 会解析多源数据并复用主管道生成 Detection、AttackChain、Attribution 与 Report。" aside={active ? <span className="freshness"><FileSearch size={15}/> {active.task_id}</span> : undefined} />
+  return <><PageHeader title="分析任务" description="新建任务、上传证据包或选择历史任务；基础分析会生成 Detection、Evidence、ATT&CK 与 AttackChain，完成后可进入工作区启动 Agent 调查。" aside={active ? <span className="freshness"><FileSearch size={15}/> {active.task_id}</span> : undefined} />
     <section className="analysis-workspace">
       <section className="analysis-history panel">
         <div className="panel-title"><h2>任务历史</h2><button type="button" className="secondary-action" onClick={()=>setTask(null)}>新建分析任务</button></div>
-        <div className="analysis-task-list">{(tasks ?? []).map(item => <button key={item.task_id} className={active?.task_id===item.task_id?'selected':''} onClick={()=>{setTask(item);setCurrentRunId(item.task_id)}}><strong>{item.upload?.filename ?? item.task_id}</strong><small>{item.status ?? 'unknown'} · {item.updated_at ? new Date(item.updated_at).toLocaleString('zh-CN') : item.task_id}</small></button>)}{!tasks?.length&&<span>暂无历史任务</span>}</div>
+        <div className="analysis-task-list">{(tasks ?? []).map(item => <button key={item.task_id} className={active?.task_id===item.task_id?'selected':''} onClick={()=>{setTask(item);setCurrentRunId(item.task_id)}}><strong>{item.upload?.filename ?? item.task_id}</strong><small>{analysisStatusName[item.status ?? ''] ?? item.status ?? 'unknown'} · {item.updated_at ? new Date(item.updated_at).toLocaleString('zh-CN') : item.task_id}</small></button>)}{!tasks?.length&&<span>暂无历史任务</span>}</div>
       </section>
       <label className={`upload-zone ${dragging ? 'dragging' : ''}`} onDragOver={event=>{event.preventDefault();setDragging(true)}} onDragLeave={()=>setDragging(false)} onDrop={onDrop}>
         <FileUp size={34} />
@@ -134,18 +147,18 @@ export function OnlineAnalysisPage() {
         <span>.log .json .jsonl .csv .pcap .zip .tar.gz</span>
         <input type="file" accept=".log,.json,.jsonl,.csv,.pcap,.zip,.gz" onChange={event=>{const file=event.target.files?.[0]; if(file) void upload(file)}} disabled={busy} />
       </label>
-      {error && <EmptyState kind="error" title="在线分析失败" detail={error} />}
+      {error && <EmptyState kind="error" title="分析任务失败" detail={error} />}
       {active && <section className="analysis-panel">
         <header>
           <div><span className="eyebrow">当前任务</span><h2>{active.upload.filename}</h2><code>{active.task_id}</code></div>
-          <span className={`status-pill ${active.status}`}>{active.status}</span>
+          <span className={`status-pill ${active.status}`}>{analysisStatusName[active.status] ?? active.status}</span>
         </header>
         <div className="analysis-discovery">
           <strong>已发现</strong>
           <div>{foundKinds.length ? foundKinds.map(kind => <span key={kind}><CheckCircle2 size={14}/>{kind}</span>) : <span>等待识别结果</span>}</div>
         </div>
         {!!active.identification.warnings.length && <p className="analysis-warning"><AlertCircle size={15}/>{active.identification.warnings.join(' ')}</p>}
-        <div className="stage-list">{active.stages.map(stage => <div key={stage.key} className={stage.status}><span /><strong>{stage.label}</strong><small>{stage.status}</small></div>)}</div>
+        <div className="stage-list">{active.stages.map(stage => <div key={stage.key} className={stage.status}><span /><strong>{stage.label}</strong><small>{stageStatusName[stage.status]}</small></div>)}</div>
         <div className="table-wrap compact-table"><table><thead><tr><th>文件</th><th>类型</th><th>记录</th><th>Parser/Normalizer</th><th>状态</th></tr></thead><tbody>{active.identification.found.map(item => <tr key={item.path}><td>{item.path}</td><td>{item.kind}</td><td>{item.records}</td><td>{item.evaluation_only ? 'Evaluation only' : `${item.source_kind ?? '-'} / ${item.dataset ?? '-'}`}</td><td>{item.parser_status}</td></tr>)}</tbody></table></div>
         {active.status === 'identified' && <button className="primary-action analysis-start" onClick={start} disabled={busy}><Play size={15}/>开始分析</button>}
         {active.error && <p className="analysis-warning"><AlertCircle size={15}/>{active.error}</p>}
@@ -172,7 +185,7 @@ function AnalysisResult({task, runScopedPath}:{task:ReadyAnalysisTask;runScopedP
       <Link className="secondary-action" to={runScopedPath('/network')}><Network size={15}/>网络流量</Link>
       <Link className="secondary-action" to={runScopedPath('/attack')}><ShieldCheck size={15}/>ATT&CK分析</Link>
       <Link className="secondary-action" to={runScopedPath('/agents')}><Bot size={15}/>启动Agent调查</Link>
-      <Link className="secondary-action" to={runScopedPath('/reports')}><FileSearch size={15}/>生成报告</Link>
+      <Link className="secondary-action" to={runScopedPath('/reports')}><FileSearch size={15}/>报告中心</Link>
     </div>
     <section className="ground-truth-note">
       <h2>Ground Truth 对比</h2>

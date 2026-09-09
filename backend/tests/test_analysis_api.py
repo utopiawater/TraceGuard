@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import zipfile
 
 from fastapi.testclient import TestClient
@@ -49,3 +50,39 @@ def test_online_analysis_pcap_without_parser_is_non_fatal(tmp_path, monkeypatch)
     assert started.status_code == 200
     assert started.json()["data"]["status"] == "completed"
     assert started.json()["data"]["result"]["normalized_events"] == 0
+
+
+def test_analysis_manifest_policy_scopes_time_asset_aliases_and_excludes_gt(tmp_path):
+    archive = tmp_path / "manifested.zip"
+    manifest = {
+        "default_timezone": "+08:00",
+        "asset_aliases": {"remote/web": "N4-Web", "web": "N4-Web"},
+        "sensitive_path_patterns": ["/data/secret/**"],
+        "attack_steps": ["ground truth must remain evaluation-only"],
+        "expected_technique": ["T0000"],
+    }
+    auditd = 'type=SYSCALL msg=audit(1788939734.337:180): arch=c000003e syscall=59 success=yes pid=2711 ppid=1 uid=0 euid=0 comm="bash" exe="/bin/bash" items=0'
+    sample = [{"timestamp": "2026-09-09T15:56:22", "host": "web", "process": "bash", "action": "process.start", "event_id": "sample-1"}]
+    with zipfile.ZipFile(archive, "w") as handle:
+        handle.writestr("manifest.json", json.dumps(manifest))
+        handle.writestr("remote/web/auditd.log", auditd)
+        handle.writestr("events.json", json.dumps(sample))
+
+    app = create_app(Settings(data_dir=tmp_path, database_path=tmp_path / "db.sqlite", raw_archive_dir=tmp_path / "raw", report_dir=tmp_path / "reports", neo4j_enabled=False))
+    client = TestClient(app)
+
+    uploaded = client.post("/api/v1/analysis/upload", files={"file": ("manifested.zip", archive.read_bytes(), "application/zip")})
+    assert uploaded.status_code == 200
+    task = uploaded.json()["data"]
+    assert task["policy"]["default_timezone"] == "+08:00"
+    assert task["policy"]["asset_aliases"]["remote/web"] == "N4-Web"
+    assert "attack_steps" not in task["policy"]
+    assert "expected_technique" not in task["policy"]
+
+    started = client.post("/api/v1/analysis/tasks/%s/start" % task["task_id"])
+    assert started.status_code == 200
+    assert started.json()["data"]["stages"][-1] == {"key": "completed", "label": "基础分析完成", "status": "completed"}
+    events = client.get("/api/events?run_id=%s&limit=20" % task["task_id"]).json()["data"]
+    assert {event["host"]["display_name"] for event in events if event.get("host")} == {"n4-web"}
+    sample_event = next(event for event in events if event["source"]["dataset"] == "sample_attack_dataset")
+    assert sample_event["event_time"] == "2026-09-09T07:56:22Z"

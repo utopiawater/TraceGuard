@@ -5,6 +5,7 @@ export interface ApiMeta {
   generated_at: string
   next_cursor: string | null
   warnings: string[]
+  total?: number
 }
 
 export interface ApiEnvelope<T> { data: T; meta: ApiMeta }

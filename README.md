@@ -1,6 +1,6 @@
 # TraceGuard
 
-TraceGuard 是面向 2026 网络空间安全课程设计的证据驱动攻击溯源平台。项目直接采用最终模块边界：FastAPI 模块化单体、SQLite 结构化事实库、append-only 原始归档、Neo4j 图投影、React/TypeScript 调查台和受证据约束的 Multi-Agent Harness。
+TraceGuard 是面向 2026 网络空间安全课程设计的证据驱动攻击溯源平台。项目直接采用最终模块边界：FastAPI 模块化单体、SQLite 结构化事实库、append-only 原始归档、Neo4j 图投影、React/TypeScript 调查台和受证据约束的 Multi-Agent Harness。答辩前产品原则是：一个证据包 = 一个分析任务 = 一个 run_id = 全平台同一攻击案件的不同视图。
 
 ## 当前已接通的主路径
 
@@ -41,6 +41,13 @@ Web 固定入口为 `http://127.0.0.1:5173`，API 文档为 `http://127.0.0.1:80
 powershell -ExecutionPolicy Bypass -File .\scripts\stop.ps1
 ```
 
+如果本机没有 Docker，但 `.runtime\neo4j-community-5.26.30` 已存在，可先启动本地 Neo4j runtime，再运行 `scripts/start.ps1`：
+
+```powershell
+Start-Process -FilePath ".\.runtime\neo4j-community-5.26.30\bin\neo4j.bat" -ArgumentList @("console") -WorkingDirectory ".\.runtime\neo4j-community-5.26.30" -WindowStyle Hidden -RedirectStandardOutput ".\.runtime\neo4j.stdout.log" -RedirectStandardError ".\.runtime\neo4j.stderr.log"
+powershell -ExecutionPolicy Bypass -File .\scripts\start.ps1
+```
+
 答辩前可以先运行 demo readiness 检查。它会检查 Python 版本、依赖、`.env`、SQLite、历史 AttackChain/Evidence、LLM 配置、前后端服务和 Neo4j 可用性；默认不要求服务必须已经启动，也不会伪造真实 LLM 结果：
 
 ```powershell
@@ -65,7 +72,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\stop.ps1
 .\.venv\Scripts\python.exe scripts/replay_dataset.py --dataset datasets/darpa_tc_e3_cadets --data-dir data/dataset_e3 --run-id run_darpa_tc_e3_001 --reset --quick-investigation --agent-fallback
 ```
 
-数据集实验报告写入 `data/dataset_e3/dataset_run_report.json`，前端 `/datasets` 页面和 `/api/datasets` 会读取该真实报告，并展示 IOC 覆盖、未覆盖 IOC 构成、低语义系统调用占比和 Ground Truth 限制说明。Ground Truth、官方 IOC、`attack_graph.json`、`attack_timeline.json` 和 `agent_input.json` 只用于 evaluation，不用于生成 Detection、ATT&CK、AttackChain 或 Agent Finding。
+当前泛化验收报告写入 `data/dataset_e3_generalization/dataset_run_report.json`，前端 `/datasets` 页面和 `/api/datasets` 会读取真实报告，并展示 IOC 覆盖、未覆盖 IOC 构成、低语义系统调用占比和 Ground Truth 限制说明。Ground Truth、官方 IOC、`attack_graph.json`、`attack_timeline.json` 和 `agent_input.json` 只用于 evaluation，不用于生成 Detection、ATT&CK、AttackChain 或 Agent Finding。
 
 Agent 调查中心保留两种调用范围：完整调查执行六个 Agent；快速调查执行 Coordinator、Host、Network、Correlation。两者共用真实 Tool、严格 Schema 和 EvidenceValidator；模型不可用时明确记录为 `deterministic_fallback`，不会伪装成 `real_llm`。
 
@@ -87,7 +94,7 @@ npm run build
 
 ## 数据集与靶场状态
 
-DARPA TC E3 CADets 公开数据集已接入统一主管道，当前验证规模为 20,776 条事件，生成 348 条 Detection、1 条 AttackChain 和可回查 Evidence。数据集页面同时展示未覆盖 IOC 的主要 action、event_type 和 process 分布，便于答辩时说明 coverage 限制。若没有生成过 `data/dataset_e3/dataset_run_report.json`，数据集页面会保持真实空状态，不使用 Mock 数据。
+DARPA TC E3 CADets 公开数据集已接入统一主管道，当前验证规模为 20,776 条事件。最新泛化回归在保守 ATT&CK 映射后生成 225 条 Detection、1 条 AttackChain 和可回查 Evidence；早期 `data/dataset_e3` snapshot 中的 348 条 Detection 是历史基线。数据集页面同时展示未覆盖 IOC 的主要 action、event_type 和 process 分布，便于答辩时说明 coverage 限制。若没有生成过 dataset run report，数据集页面会保持真实空状态，不使用 Mock 数据。
 
 8+ 节点真实靶场由云平台同学部署。本仓库提供拓扑、采集规范和日志 bundle 接入契约；云端导出的 Wazuh/Sysmon/Auditd/Zeek 日志到位后，可按 `docs/13_cloud_testbed_handoff.md` 接入 TraceGuard。
 

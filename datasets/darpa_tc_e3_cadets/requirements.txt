@@ -1,0 +1,6 @@
+# JSON/CSV preprocessing uses Python's standard library.
+# Optional: required only for Avro binary input.
+fastavro==1.12.2
+# Optional backend example:
+# fastapi
+# uvicorn

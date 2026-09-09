@@ -40,6 +40,8 @@ export const executionModeName: Record<string, string> = {
 
 export const sourceStatusName: Record<string, string> = {
   ingested: '已接入',
+  healthy: '已接入',
+  normal: '已接入',
   no_events: '无事件',
   delayed: '延迟',
   stale: '延迟',

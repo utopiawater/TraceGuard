@@ -1,4 +1,4 @@
-import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 
@@ -21,6 +21,7 @@ interface AnalysisContextValue {
 
 const AnalysisContext = createContext<AnalysisContextValue | null>(null)
 const STORAGE_KEY = 'traceguard.current_run_id'
+const ALL_RUNS = '__all__'
 
 export function AnalysisProvider({ children }: { children: ReactNode }) {
   const location = useLocation()
@@ -28,7 +29,12 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
   const [params] = useSearchParams()
   const { data } = useApi<AnalysisRunSummary[]>('/api/v1/analysis/tasks')
   const runs = data ?? []
-  const [currentRunId, setCurrentRunIdState] = useState<string | null>(() => localStorage.getItem(STORAGE_KEY))
+  const initialStoredRun = useRef(localStorage.getItem(STORAGE_KEY))
+  const shouldAutoSelectRun = useRef(initialStoredRun.current == null)
+  const [currentRunId, setCurrentRunIdState] = useState<string | null>(() => {
+    const stored = initialStoredRun.current
+    return stored === ALL_RUNS ? null : stored
+  })
   const urlRunId = params.get('run_id')
 
   useEffect(() => {
@@ -36,12 +42,15 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
   }, [urlRunId, currentRunId])
 
   useEffect(() => {
-    if (!currentRunId && runs[0]?.task_id) setCurrentRunIdState(runs[0].task_id)
+    if (!currentRunId && shouldAutoSelectRun.current && runs[0]?.task_id) {
+      shouldAutoSelectRun.current = false
+      setCurrentRunIdState(runs[0].task_id)
+    }
   }, [currentRunId, runs])
 
   useEffect(() => {
     if (currentRunId) localStorage.setItem(STORAGE_KEY, currentRunId)
-    else localStorage.removeItem(STORAGE_KEY)
+    else if (!shouldAutoSelectRun.current) localStorage.setItem(STORAGE_KEY, ALL_RUNS)
   }, [currentRunId])
 
   const runScopedPath = (path: string, extra?: Record<string, string | null | undefined>) => {
@@ -58,6 +67,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
   }
 
   const setCurrentRunId = (runId: string | null, navigateToWorkspace = false) => {
+    shouldAutoSelectRun.current = false
     setCurrentRunIdState(runId)
     const target = navigateToWorkspace ? '/' : `${location.pathname}${location.search}`
     const [base, query = ''] = target.split('?')

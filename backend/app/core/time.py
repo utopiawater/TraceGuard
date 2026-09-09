@@ -30,6 +30,10 @@ def timezone_from_string(value: Optional[str]) -> timezone:
     normalized = value.strip()
     if normalized.upper() in {"UTC", "Z", "+00:00", "+0000"}:
         return timezone.utc
+    if normalized.upper().startswith(("UTC", "GMT")):
+        normalized = normalized[3:].strip()
+        if not normalized:
+            return timezone.utc
     match = re.fullmatch(r"([+-])(\d{2}):?(\d{2})", normalized)
     if not match:
         return timezone.utc

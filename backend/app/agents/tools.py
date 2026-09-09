@@ -245,7 +245,7 @@ def build_tool_gateway(repo: SQLiteRepository, graph, attack: MappingFileProvide
 
     def source_health(args: dict) -> dict:
         values = {}
-        for event in repo.query_events(run_id=args.get("run_id"), limit=50000):
+        for event in repo.all_events(run_id=args.get("run_id")):
             values[event.source.sensor_id] = {
                 "sensor_id": event.source.sensor_id, "kind": event.source.kind.value,
                 "last_event_time": event.event_time.isoformat(), "status": "ingested",

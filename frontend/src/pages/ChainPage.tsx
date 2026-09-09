@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Maximize2, Play, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import type { components } from '../api/generated'
+import { apiGet } from '../api/client'
 import { EmptyState } from '../components/EmptyState'
 import { PageHeader } from '../components/PageHeader'
 import { useAnalysis } from '../context/AnalysisContext'
@@ -178,15 +179,16 @@ export function ChainPage() {
   const { currentRunId: runId } = useAnalysis()
   const scoped = runId ? `run_id=${encodeURIComponent(runId)}` : ''
   const { data: chains, error, loading } = useApi<Chain[]>(`/api/chains${scoped ? `?${scoped}` : ''}`)
-  const { data: graph } = useApi<Graph>(`/api/graph${scoped ? `?${scoped}` : ''}`)
-  const { data: evidence } = useApi<Evidence[]>(`/api/evidence?limit=500${scoped ? `&${scoped}` : ''}`)
   const { data: attack } = useApi<AttackTechnique[]>(`/api/attack${scoped ? `?${scoped}` : ''}`)
   const requested = params.get('chain')
   const requestedEvidence = params.get('evidence')
   const chain = chains?.find(item=>item.chain_id===requested) ?? (chains ? [...chains].sort((a,b)=>b.completeness-a.completeness||Date.parse(b.end_time)-Date.parse(a.end_time))[0] : undefined)
+  const graphPath = chain ? `/api/graph?chain_id=${encodeURIComponent(chain.chain_id)}${scoped ? `&${scoped}` : ''}` : `/api/graph${scoped ? `?${scoped}` : ''}`
+  const { data: graph } = useApi<Graph>(graphPath)
   const canvas = useRef<HTMLDivElement>(null)
   const cyRef = useRef<cytoscape.Core|null>(null)
   const anchorsRef = useRef<Map<string, string>>(new Map())
+  const [evidenceById, setEvidenceById] = useState<Record<string, Evidence>>({})
   const [selected, setSelected] = useState<ChainStep|null>(null)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null)
@@ -201,6 +203,27 @@ export function ChainPage() {
     setSelectedNodeId(next?.technique_id ?? null)
     setPlaying(false)
   }, [chain?.chain_id, requestedEvidence])
+
+  useEffect(() => {
+    setEvidenceById({})
+    setMainOnly(false)
+    setHoverInfo(null)
+  }, [runId, chain?.chain_id])
+
+  useEffect(() => {
+    const ids = [...new Set([...(selected?.evidence_ids ?? []), ...(requestedEvidence ? [requestedEvidence] : [])])]
+    if (!ids.length) return
+    let cancelled = false
+    Promise.all(ids.map(id => apiGet<Evidence>(`/api/evidence/${encodeURIComponent(id)}`).then(value => value.data).catch(() => null))).then(values => {
+      if (cancelled) return
+      const next: Record<string, Evidence> = {}
+      values.forEach(value => {
+        if (value) next[value.evidence_id] = value
+      })
+      setEvidenceById(next)
+    })
+    return () => { cancelled = true }
+  }, [selected?.step_id, requestedEvidence, runId, chain?.chain_id])
 
   useEffect(() => {
     if (!canvas.current || !graph?.nodes.length || !chain) return
@@ -502,6 +525,7 @@ export function ChainPage() {
   }, [playing, chain?.chain_id])
 
   const selectedNode = graph?.nodes.find(node => node.entity_id === selectedNodeId)
+  const evidence = Object.values(evidenceById)
   const techniqueName = (techniqueId?: string) => attack?.find(item=>item.technique_id===techniqueId)?.technique_name
 
   const handleStageClick = (step: ChainStep) => {

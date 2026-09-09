@@ -18,11 +18,13 @@ Dataset Adapter ─┘
 - dataset_name: `DARPA TC E3 CADets`
 - input_records: 20,776
 - normalized_records: 20,776
-- detection_count: 348
+- detection_count: 225
 - chain_count: 1
-- report: `data/dataset_e3/dataset_run_report.json`
+- report: `data/dataset_e3_generalization/dataset_run_report.json`
 - frontend: `/datasets` 页面读取 `/api/datasets` 的真实报告，展示 IOC 覆盖、未覆盖 IOC 构成和二分类指标 N/A 原因。
 - Precision / Recall / F1: N/A，因为该切片不具备完备逐事件 benign/attack 二分类真值。
+
+说明：早期 `data/dataset_e3` snapshot 曾生成 348 条 Detection。真实靶场泛化修复后，单纯内存保护和普通权限上下文不再过度映射为 `T1055` / `T1068`，因此当前验收基线为 225 条 Detection、Technique `T1005` / `T1046` / `T1071.001`。数量下降是 ATT&CK 降噪结果，不是解析回归。
 
 ## 2. 候选数据集
 

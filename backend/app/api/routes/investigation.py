@@ -12,8 +12,16 @@ router = APIRouter(tags=["investigation"])
 
 
 @router.get("/detections")
-def detections(limit: int = Query(default=100, ge=1, le=500), run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository)) -> dict:
-    return response([item.model_dump(mode="json") for item in repo.list_detections(limit, run_id=run_id)])
+def detections(limit: int = Query(default=100, ge=1, le=500), offset: int = Query(default=0, ge=0), run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository)) -> dict:
+    return response([item.model_dump(mode="json") for item in repo.list_detections(limit, run_id=run_id, offset=offset)], total=repo.count_table("detections", run_id=run_id))
+
+
+@router.get("/detections/{detection_id}")
+def detection_detail(detection_id: str, repo: SQLiteRepository = Depends(repository)) -> dict:
+    item = repo.get_detection(detection_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="detection not found")
+    return response(item.model_dump(mode="json"))
 
 
 @router.get("/alerts")
@@ -23,8 +31,8 @@ def alerts(repo: SQLiteRepository = Depends(repository)) -> dict:
 
 
 @router.get("/chains")
-def chains(limit: int = Query(default=100, ge=1, le=500), run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository)) -> dict:
-    return response([item.model_dump(mode="json") for item in repo.list_chains(limit, run_id=run_id)])
+def chains(limit: int = Query(default=100, ge=1, le=500), offset: int = Query(default=0, ge=0), run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository)) -> dict:
+    return response([item.model_dump(mode="json") for item in repo.list_chains(limit, run_id=run_id, offset=offset)], total=repo.count_table("attack_chains", run_id=run_id))
 
 
 @router.get("/chains/{chain_id}")
@@ -33,6 +41,29 @@ def chain(chain_id: str, repo: SQLiteRepository = Depends(repository)) -> dict:
     if not item:
         raise HTTPException(status_code=404, detail="attack chain not found")
     return response(item.model_dump(mode="json"))
+
+
+@router.get("/chains/{chain_id}/graph")
+def chain_graph(chain_id: str, repo: SQLiteRepository = Depends(repository), projector=Depends(graph)) -> dict:
+    item = repo.get_chain(chain_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="attack chain not found")
+    allowed_ids = set(item.entity_ids) | set(item.detection_ids) | set(item.technique_ids) | {sid for step in item.steps for sid in step.session_ids}
+    for evidence_id in item.evidence_ids:
+        evidence = repo.get_evidence(evidence_id)
+        if evidence and repo.get_evidence_run_id(evidence_id) == item.run_id:
+            allowed_ids.update(evidence.entity_ids)
+    nodes = [value for value in projector.entities.values() if value.entity_id in allowed_ids]
+    node_ids = {node.entity_id for node in nodes}
+    edges = [value for value in projector.relations.values() if value.source_entity_id in node_ids and value.target_entity_id in node_ids]
+    return response({
+        "nodes": [value.model_dump(mode="json") for value in nodes],
+        "edges": [value.model_dump(mode="json") for value in edges],
+        "limit": None,
+        "chain_id": chain_id,
+        "run_id": item.run_id,
+        "runtime": projector.status() if hasattr(projector, "status") else {"configured": False, "connected": False, "backend": "memory"},
+    })
 
 
 @router.post("/chains/{chain_id}/investigate")
@@ -56,11 +87,13 @@ def investigate_chain(
 
 
 @router.get("/graph")
-def graph_slice(run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository), projector=Depends(graph)) -> dict:
+def graph_slice(run_id: Optional[str] = None, chain_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository), projector=Depends(graph)) -> dict:
+    if chain_id:
+        return chain_graph(chain_id, repo, projector)
     allowed_ids = None
     if run_id:
-        events = repo.query_events(run_id=run_id, limit=50000)
-        detections = repo.list_detections(50000, run_id=run_id)
+        events = repo.all_events(run_id=run_id)
+        detections = repo.all_detections(run_id=run_id)
         allowed_ids = {ref for event in events for ref in [
             event.host.entity_id if event.host else None,
             event.actor.user.entity_id if event.actor.user else None,

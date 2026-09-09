@@ -31,6 +31,15 @@ export function AgentsPage(){
   const [error,setError]=useState<string|null>(null)
   const selectedCase=params.get('case')
 
+  useEffect(()=>{
+    setChainId('')
+    setDetail(null)
+    setSelectedTask(null)
+    setItems([])
+    setLoading(true)
+    if (selectedCase) setParams(runId ? {run_id:runId} : {})
+  },[runId])
+  useEffect(()=>{if(chainId&&chains&&!chains.some(chain=>chain.chain_id===chainId))setChainId('')},[chains,chainId])
   useEffect(()=>{if(!chainId&&chains?.length)setChainId([...chains].sort((a,b)=>b.steps.length-a.steps.length||b.completeness-a.completeness)[0].chain_id)},[chains,chainId])
   const load=useCallback(async()=>{try{const value=await apiGet<Investigation[]>(`/api/agents${scoped ? `?${scoped}` : ''}`);setItems(value.data);setError(null)}catch(reason){setError((reason as Error).message)}finally{setLoading(false)}},[scoped])
   useEffect(()=>{void load()},[load])

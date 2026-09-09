@@ -1,5 +1,7 @@
 # Web 调查平台产品设计
 
+本文件保留早期 Web 调查台设计。答辩前的产品收口版以 `docs/TraceGuard_产品设计规划.md` 为准；其核心原则是“一个证据包 = 一个分析任务 = 一个 run_id = 全平台同一攻击案件的不同视图”。
+
 ## 1. 产品定位
 
 Web 端是“证据驱动的攻击调查台”，不是大屏拼图。主流程只有一条：
@@ -18,7 +20,7 @@ Web 端是“证据驱动的攻击调查台”，不是大屏拼图。主流程�
 | 页面 | 展示内容 | 数据来源 | 主要 API | 对应需求 |
 |---|---|---|---|---|
 | 安全态势总览 | 活跃案例、严重度、数据源健康、时间质量、最近攻击链、资产受影响范围 | event/detection/case/source health | `GET /overview`、`GET /sources/health` | R3-02、R3-04、Q-01 |
-| 企业网络拓扑 | 9 节点角色、网段、传感器覆盖、资产状态、受控路径叠加 | asset inventory、Host/HAS_IP、testbed manifest | `GET /assets/topology` | R3-13、R3-29 |
+| 企业网络拓扑 | 9 节点角色、网段、传感器覆盖、资产状态、受控路径叠加 | asset inventory、Host/HAS_IP、testbed manifest | 未来接口 | R3-13、R3-29 |
 | 攻击事件中心 | Detection/Case 列表、筛选、状态、证据计数、数据模式 | DetectionResult、Case | `GET /detections`、`GET/POST /cases` | R3-17、R3-18、Q-02 |
 | 攻击链溯源 | 课程阶段时间线、步骤图、入口、横移、提权、数据路径、缺口 | AttackChain、Graph、Evidence | `GET /chains/{id}`、`/graph`、`/evidence` | R3-19~R3-23 |
 | 主机行为分析 | 登录会话、进程树、文件/注册表、权限与内存行为 | UnifiedEvent、Session、Host graph | `GET /hosts/{id}/timeline`、`/process-tree`、`/sessions` | R3-03、R3-06~R3-12 |
@@ -27,7 +29,7 @@ Web 端是“证据驱动的攻击调查台”，不是大屏拼图。主流程�
 | Agent 与归因中心 | 任务图、各 Agent 状态、finding、证据、候选组织和反证 | AgentTask/Result、Attribution | `POST /cases/{id}/agent-runs`、`GET /agent-runs/{id}`、`/attribution` | R3-01、R3-24~R3-26 |
 | 报告与实验 | 报告版本、数据集指标、靶场 Ground Truth 对比、导出 | reports、evaluation runs | `GET /reports`、`GET /evaluations/{id}` | R3-27~R3-31 |
 
-页面可在开发早期合并：企业拓扑并入总览、ATT&CK 并入攻击链、报告与 Agent 归因合并。不要为了“9 个页面”牺牲闭环。
+当前实现没有单独企业拓扑页面；资产/来源覆盖在 Dashboard、数据源与资产、安全实体视图、AttackChain 页面中展示。不要为了“页面数量”牺牲闭环。
 
 ## 3. 关键页面
 
@@ -42,7 +44,7 @@ Web 端是“证据驱动的攻击调查台”，不是大屏拼图。主流程�
 
 组件：
 
-- Source Health：Wazuh/Sysmon/Auditd/Zeek 延迟、最后事件、dead-letter、capture loss；
+- Source Status：Wazuh/Sysmon/Auditd/Zeek 等来源的已接入事件量和最后事件时间；没有实时 heartbeat 时不写 Sensor Healthy；
 - Time Quality：offset/uncertainty 分布，不能把“最新入库延迟”误称时钟偏差；
 - Active Cases：严重度、开始/结束、入口候选、最高阶段；
 - Affected Assets：按角色和网段，而非无意义总数；
@@ -71,7 +73,7 @@ Web 端是“证据驱动的攻击调查台”，不是大屏拼图。主流程�
 [替代路径与未证实结论]
 ```
 
-默认只展示当前链涉及节点。图节点数默认≤100，超过时聚合或分页；双击实体进入主机/网络页面，点击边查看 relation_id 和 evidence。
+默认只展示当前链涉及节点。当前实现通过 `chain_id` 精确加载链相关图节点和 Evidence；全局实体视图仍是 bounded 视图，不应宣称完整知识图谱。
 
 链状态只能由 Ground Truth runner 或人工审阅改为 confirmed。Agent 建议边以虚线候选显示，不直接写入事实图。
 
@@ -201,3 +203,10 @@ C2 信息分三层：
 7. 2 分钟：架构、自研边界和限制。
 
 产品页面必须服务这条脚本，无法进入脚本的 Dashboard 属于 P2。
+
+## 9. 当前实现边界
+
+- 当前“分析任务”是证据包/replay 分析，不是真正实时在线监测。
+- “威胁归因”是候选相似性分析；证据不足时 `unable_to_attribute` 是正确结果。
+- 报告中心只展示已实际生成并持久化的 Markdown/HTML 报告；基础分析完成不等于报告已生成。
+- 搜索已覆盖事件、Detection、Evidence、AttackChain、Session、Agent、Report；结果跳转会保留当前 run，但部分列表页仍以分页表格承载定位。

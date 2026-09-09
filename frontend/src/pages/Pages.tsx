@@ -3,11 +3,11 @@ import { EmptyState } from '../components/EmptyState'
 import { PageHeader } from '../components/PageHeader'
 import { useAnalysis } from '../context/AnalysisContext'
 import { useApi } from '../hooks/useApi'
-import { pct } from '../lib/display'
+import { pct, sourceStatusName, taskStatusName } from '../lib/display'
 import { Link, useSearchParams } from 'react-router-dom'
 
 export const IncidentsPage=()=> <ResourcePage title="攻击事件中心" description="当前 run 的 Detection：规则、置信度、ATT&CK 映射与 Evidence 引用。" endpoint="/api/detections" columns={[["title","事件"],["severity","严重度"],["confidence","置信度"],["attack_mappings.0.subtechnique_id|attack_mappings.0.technique_id","ATT&CK"],["rule_id","规则"],["created_at","发生时间"]]}/>
-export const GraphPage=()=> <ResourcePage title="安全知识图谱" description="当前 run 的规范化实体与有 Evidence 引用的行为关系。" endpoint="/api/entities" columns={[["display_name","实体"],["entity_type","类型"],["first_seen","首次出现"],["last_seen","最后出现"]]}/>
+export const GraphPage=()=> <ResourcePage title="安全实体视图" description="当前 run 的规范化实体清单；完整攻击关系请在“攻击链溯源”页面查看。" endpoint="/api/entities" columns={[["display_name","实体"],["entity_type","类型"],["first_seen","首次出现"],["last_seen","最后出现"]]}/>
 export const HostsPage=()=> <ResourcePage title="主机行为分析" description="当前 run 按资产聚合进程、文件、登录、权限和内存行为。" endpoint="/api/hosts" columns={[["hostname","主机"],["logins","登录"],["process","进程"],["file","文件"],["registry","注册表"],["privilege","权限"],["memory","内存"],["last_seen","最后活动"]]}/>
 export const NetworkPage=()=> <ResourcePage title="网络流量分析" description="当前 run 的 flow、DNS、HTTP、ICMP 和主机通信关系。" endpoint="/api/network" columns={[["event_time","时间"],["source","来源"],["action","动作"],["transport","协议"],["application","应用"],["src","源端"],["dst","目标端"],["bytes_sent","发送字节"]]}/>
 export const EventsPage=()=> <ResourcePage title="日志与安全事件" description="当前 run 的 UnifiedSecurityEvent 与 Evidence 回查入口。" endpoint="/api/events" columns={[["event_time","事件时间"],["source.kind","来源"],["host.display_name","主机"],["action","动作"],["event_type","类型"],["message","摘要"],["provenance.parser_name","解析器"]]}/>
@@ -18,7 +18,7 @@ interface SearchResult { type:string;type_label:string;id:string;title:string;su
 
 export const SearchPage=()=> {
   const [params] = useSearchParams()
-  const { currentRunId: runId } = useAnalysis()
+  const { currentRunId: runId, runScopedPath } = useAnalysis()
   const query = params.get('q')?.trim() ?? ''
   const endpoint = query ? `/api/search?q=${encodeURIComponent(query)}&limit=60${runId ? `&run_id=${encodeURIComponent(runId)}` : ''}` : '/api/search?q=__empty__&limit=1'
   const { data, loading, error, meta } = useApi<SearchResult[]>(endpoint)
@@ -28,7 +28,7 @@ export const SearchPage=()=> {
     {query && loading && <div className="skeleton-list"><span/><span/><span/></div>}
     {query && error && <EmptyState kind="error" title="搜索失败" detail={error}/>}
     {query && !loading && !error && results.length === 0 && <EmptyState title="没有匹配结果" detail={meta?.warnings[0] ?? '换一个更具体的 ID、IP、进程名或 Evidence 编号再试。'} />}
-    {query && !!results.length && <section className="search-results">{results.map(item=><Link className="search-result" to={item.href} key={`${item.type}-${item.id}`}><div><span className={`search-type ${item.type}`}>{item.type_label}</span>{item.run_id&&<code>{item.run_id}</code>}</div><strong>{item.title}</strong><small>{item.subtitle}</small><p>{item.match}</p><footer><code>{item.id}</code>{item.timestamp&&<time>{new Date(item.timestamp).toLocaleString('zh-CN')}</time>}</footer></Link>)}</section>}
+    {query && !!results.length && <section className="search-results">{results.map(item=><Link className="search-result" to={runScopedPath(item.href)} key={`${item.type}-${item.id}`}><div><span className={`search-type ${item.type}`}>{item.type_label}</span>{item.run_id&&<code>{item.run_id}</code>}</div><strong>{item.title}</strong><small>{item.subtitle}</small><p>{item.match}</p><footer><code>{item.id}</code>{item.timestamp&&<time>{new Date(item.timestamp).toLocaleString('zh-CN')}</time>}</footer></Link>)}</section>}
   </>
 }
 
@@ -84,7 +84,7 @@ export const DatasetsPage=()=> {
           <span>{run.source}</span>
           <code>{run.scenario}</code>
         </div>
-        <span className={`status-pill ${run.status}`}>{run.status}</span>
+        <span className={`status-pill ${run.status}`}>{taskStatusName[run.status] ?? run.status}</span>
       </header>
       <div className="dataset-metrics">
         <Metric label="输入事件" value={run.records} />

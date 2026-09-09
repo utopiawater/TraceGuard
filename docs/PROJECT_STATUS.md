@@ -1,6 +1,6 @@
 # TraceGuard Project Status
 
-本文件是 TraceGuard 当前仓库状态的交接文档。结论以 2026-09-09 本地仓库、数据集运行报告、测试结果和文档为准；如果它与早期聊天记录或旧设计文档冲突，以当前代码和本文件为准。
+本文件是 TraceGuard 当前仓库状态的交接文档。结论以 2026-09-10 本地仓库、数据集运行报告、测试结果和文档为准；如果它与早期聊天记录或旧设计文档冲突，以当前代码和本文件为准。
 
 严禁在本文档、日志、前端接口、报告或提交中记录 `.env` 的真实内容、API Key、Neo4j 密码或其他密钥。
 
@@ -38,11 +38,12 @@ Collector / Replay / DARPA Dataset
 - ATT&CK knowledge 固定在 `knowledge/attack/mappings.json`，当前 T1046 名称为 `Network Service Scanning`。
 - AttackChain 仍由 `DeterministicChainBuilder` 基于 Detection 和 ATT&CK tactic 生成，不读取 Ground Truth。
 - Multi-Agent 保持六角色：Coordinator、Host、Network、Correlation、Attribution、Report。Quick scope 使用 Coordinator、Host、Network、Correlation；真实 LLM 不可用时明确记录 deterministic fallback。
-- Frontend 13 个页面接真实 API，不用业务 mock 伪造结果。
+- Frontend 13 个页面接真实 API，不用业务 mock 伪造结果。当前产品原则已收敛为“一个证据包 -> 一个分析任务 -> 一个 run_id -> 全平台同一攻击案件的不同视图”，详见 `docs/TraceGuard_产品设计规划.md`。
 - `/api/datasets` 和 Dataset 页面已读取真实 DARPA run report；Dataset 页面会展示 IOC coverage、未覆盖 IOC 构成、低语义系统调用占比和指标限制说明。
 - 前端展示层已统一中文状态、百分比置信度、AttackChain 链可信评分/完整度/阶段数说明、ATT&CK ID + 名称展示，以及 Dataset/Agent/Attribution 指标 tooltip；底层 API 字段保持不变。
 - 全局搜索已接入：顶部搜索框跳转 `/search?q=...`，后端 `/api/search` 只读查询 normalized events、detections、evidence、attack chains、sessions、Agent tasks/results 和 reports，不暴露 raw envelope、Ground Truth 或密钥类配置。
 - 数据源页面和 Agent source health 中的状态从“healthy”语义收窄为“ingested/已接入”，避免把历史事件存在误读为传感器实时健康。
+- 页面真实性收口已完成：Events / Detections / Sessions / Evidence / Chains / Network 支持 run scope、分页、total；AttackChain 页面按 `chain_id` 精确加载图与 Evidence；Host/Sources/ATT&CK/graph 投影不再先截断 500/5000/50000 条再聚合。
 
 ## 3. DARPA TC E3 CADets 接入状态
 
@@ -110,6 +111,13 @@ py -3.13 scripts/replay_dataset.py --dataset datasets/darpa_tc_e3_cadets --data-
 - `cd frontend; npm.cmd test`: passed，1 file / 2 tests
 - `cd frontend; npm.cmd run build`: passed
 
+2026-09-10 页面真实性与 Current Run 收口后的定点验证：
+
+- `.\.venv\Scripts\python.exe -m pytest backend\tests\test_page_truthfulness.py backend\tests\test_analysis_api.py backend\tests\test_demo_scripts.py backend\tests\test_testbed_generalization.py --basetemp=data\pytest_truth_run5`: passed，23 passed / 2 warnings
+- `.\.venv\Scripts\python.exe scripts\self_check.py`: passed，8 checks
+- `cd frontend; npm.cmd test`: passed，1 file / 2 tests
+- `cd frontend; npm.cmd run build`: passed
+
 2026-09-09 真实靶场泛化修复后的验证：
 
 - `py -3.13 scripts/self_check.py`: passed，8 checks
@@ -134,7 +142,7 @@ py -3.13 scripts/demo_readiness.py
 
 该脚本检查 Python、依赖、`.env`、SQLite demo 数据、历史 AttackChain/Evidence、LLM 配置、FastAPI、frontend、Neo4j、release snapshot 和 Agent EvidenceValidator；默认不要求服务必须启动，`--require-services` 可切换为硬性服务检查。`scripts/release_verify.py` 是更严格的历史真实 DeepSeek release snapshot 验收，可能因空库、服务未启动、Neo4j 未连或 release case 不存在而失败，不应作为 clean checkout 的第一条健康检查命令。
 
-本轮已修复 Windows 本地 `.env` 的非密钥路径配置：`TRACEGUARD_DATABASE_PATH`、`TRACEGUARD_RAW_ARCHIVE_DIR`、`TRACEGUARD_REPORT_DIR` 均指向项目内 `data/`。当前为验证全局搜索，已临时以 `TRACEGUARD_NEO4J_ENABLED=false` 启动 FastAPI/frontend；`py -3.13 scripts/demo_readiness.py` 通过，唯一 warning 是 `neo4j_runtime`。正式答辩前如需图数据库联通，应先启动 Neo4j 7687，再使用 `scripts/start.ps1` 启动。
+本轮已修复 Windows 本地 `.env` 的非密钥路径配置：`TRACEGUARD_DATABASE_PATH`、`TRACEGUARD_RAW_ARCHIVE_DIR`、`TRACEGUARD_REPORT_DIR` 均指向项目内 `data/`。2026-09-10 已用本地 `.runtime\neo4j-community-5.26.30` 启动 Neo4j，并通过 `scripts/start.ps1` 重新启动 FastAPI/frontend；`/api/system/health` 显示 `graph.configured=true`、`graph.connected=true`、`uri=bolt://127.0.0.1:7687`。`.\.venv\Scripts\python.exe scripts\demo_readiness.py --require-services` passed 且无 warnings。
 
 ## 5. 云靶场分工状态
 
@@ -168,21 +176,21 @@ dry-run 不写数据库、不生成 Detection/AttackChain，只输出节点、�
 1. 等云平台靶场日志 bundle 到位后，按 `docs/13_cloud_testbed_handoff.md` 导入 TraceGuard 并生成 run report。
 2. 固定一条答辩演示流程：启动系统 -> 展示七阶段 fixture -> 展示 DARPA Dataset -> 展示 Agent 调查 -> 展示报告导出。
 3. 补最终课程报告/PPT：系统架构、数据模型、检测规则、ATT&CK、AttackChain、Agent、公开数据集评估、云靶场验证、局限性。
-4. `.pytest-*` / `.tmp-*` / `data/test_tmp_*` 已加入 `.gitignore`；之前误跟踪的 pytest 临时输出应从 Git 索引移除后随本轮收口提交。
+4. `.pytest-*` / `.tmp-*` / `data/test_tmp_*` / `data/pytest_truth_run*/` 已加入 `.gitignore`；之前误跟踪的 pytest 临时输出应从 Git 索引移除后随本轮收口提交。
 5. 决定 Dataset 大文件策略：`processed_dataset/*.json` 建议 Git LFS 或外部下载说明；`data/dataset_e3/traceguard.db` 和 raw archive 不提交。
 
 ## 7. 当前已知限制
 
 - DARPA Precision / Recall / F1 为 N/A，原因是缺少完整逐事件二分类真值。
 - Attribution 是候选相似性分析，不是攻击者身份确认。
-- Neo4j 图查询和前端图谱是 bounded 视图，不是无限全库图遍历。
+- Neo4j 图查询和前端图谱是 bounded 视图，不是无限全库图遍历；AttackChain 核心页面已按 `chain_id` 精确加载链相关图节点和 Evidence。
 - PDF 报告导出未实现，当前支持 Markdown/HTML。
 - 真实云靶场同学提供的 `攻击行为记录.zip` 已由本仓库直接验证一次。当前可解析 Nginx/C2 HTTP、Auditd 和 EVTX；PCAP 因本机缺 Zeek/tshark 未解析；N6 普通 syslog/auth.log 尚未进入统一 normalizer。
 - 本次真实靶场 run report: `data/testbed_upload_analysis_final/testbed_upload_run_report.json`。该目录为本地运行产物，不建议提交 Git。
 
 ## 8. 最近一次状态更新时间
 
-- Date: 2026-09-09
+- Date: 2026-09-10
 - Branch: `main`
-- HEAD at latest committed DARPA/dashboard integration before closeout edits: `a13ee56`
-- Working tree note: 正常源码改动应只来自当前任务；仍可能显示既有 `.pytest-*` / `.tmp-*` 权限受限临时目录状态，提交时需显式白名单 staging。
+- HEAD before this documentation/code closeout: `5736549`
+- Working tree note: 正常源码改动应只来自当前任务；提交时需显式白名单 staging，避免把 `datasets/darpa_tc_e3_cadets/` 中未跟踪的大型数据或 Evaluation-only JSON 误提交。

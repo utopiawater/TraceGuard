@@ -102,6 +102,7 @@ data/dataset_e3_generalization/
 data/test_tmp_*/
 data/self_check_tmp/
 data/pytest_tmp/
+data/pytest_truth_run*/
 data/manual_generalization_checks*/
 data/testbed_analysis/
 data/testbed_bundles/

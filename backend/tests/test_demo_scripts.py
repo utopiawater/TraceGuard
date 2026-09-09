@@ -53,6 +53,37 @@ nodes:
     assert payload["missing_critical_data"] == []
 
 
+def test_testbed_import_dry_run_reads_json_manifest_policy(tmp_path):
+    bundle = tmp_path / "bundle"
+    (bundle / "remote" / "web").mkdir(parents=True)
+    (bundle / "manifest.json").write_text(
+        json.dumps({
+            "scenario_id": "json-manifest-policy",
+            "run_id": "run_json_manifest",
+            "default_timezone": "+08:00",
+            "asset_aliases": {"remote/web": "N4-Web", "web": "N4-Web"},
+            "sensitive_path_patterns": ["/data/secret/**"],
+            "ground_truth": {"expected_technique": ["T0000"]},
+        }),
+        encoding="utf-8",
+    )
+    (bundle / "remote" / "web" / "auditd.log").write_text(
+        'type=SYSCALL msg=audit(1788939734.337:180): arch=c000003e syscall=59 success=yes exe="/bin/bash"\n',
+        encoding="utf-8",
+    )
+
+    result = run_script("scripts/testbed_import_dry_run.py", "--bundle", str(bundle))
+
+    assert result.returncode == 1
+    payload = json.loads(result.stdout)
+    assert payload["run_id"] == "run_json_manifest"
+    assert payload["policy"]["default_timezone"] == "+08:00"
+    assert payload["policy"]["asset_aliases"]["remote/web"] == "N4-Web"
+    assert "ground_truth" not in payload["policy"]
+    assert payload["source_counts"]["auditd"] == 1
+    assert payload["normalized_events"] == 1
+
+
 def test_demo_readiness_empty_database_reports_preparation_command(tmp_path):
     env = {
         "TRACEGUARD_DATA_DIR": str(tmp_path),

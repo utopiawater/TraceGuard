@@ -27,9 +27,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.state.repository = SQLiteRepository(active.database_path)
     app.state.graph = RuntimeGraphProjector(active.neo4j_uri, active.neo4j_user, active.neo4j_password, active.neo4j_enabled, Path(__file__).parents[2] / "deploy" / "neo4j" / "schema.cypher")
     app.state.graph.project(EntityResolver().resolve(
-        app.state.repository.query_events(limit=50000),
-        app.state.repository.query_sessions(limit=50000),
-        app.state.repository.list_detections(50000),
+        app.state.repository.all_events(),
+        app.state.repository.all_sessions(),
+        app.state.repository.all_detections(),
     ))
     app.state.investigation_service = InvestigationService(app.state.repository, app.state.graph, active)
     app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"], allow_credentials=False, allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["*"])

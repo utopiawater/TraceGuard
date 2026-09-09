@@ -216,7 +216,7 @@ class InvestigationService:
 
     def _run_host(self, task: AgentTask, chain: AttackChain, quick: bool = False) -> Tuple[AgentResult, dict]:
         running, _ = self._start(task, chain.chain_id)
-        detections = [item for item in self.repo.list_detections(50000, run_id=chain.run_id) if item.rule_id.startswith(HOST_RULE_PREFIXES)]
+        detections = [item for item in self.repo.all_detections(run_id=chain.run_id) if item.rule_id.startswith(HOST_RULE_PREFIXES)]
         detection_data = self._invoke(running, "detection_lookup", {"run_id": chain.run_id, "ids": [item.detection_id for item in detections[:50]]}) if detections else {"detections": []}
         actions = ["auth.", "process.", "file.", "registry.", "privilege.", "memory."]
         event_data = self._invoke(running, "event_search", {"run_id": chain.run_id, "actions": actions, "limit": 60 if quick else 200})
@@ -233,7 +233,7 @@ class InvestigationService:
 
     def _run_network(self, task: AgentTask, chain: AttackChain, quick: bool = False) -> Tuple[AgentResult, dict]:
         running, _ = self._start(task, chain.chain_id)
-        detections = [item for item in self.repo.list_detections(50000, run_id=chain.run_id) if item.rule_id.startswith(NETWORK_RULE_PREFIXES)]
+        detections = [item for item in self.repo.all_detections(run_id=chain.run_id) if item.rule_id.startswith(NETWORK_RULE_PREFIXES)]
         detection_data = self._invoke(running, "detection_lookup", {"run_id": chain.run_id, "ids": [item.detection_id for item in detections[:50]]}) if detections else {"detections": []}
         event_data = self._invoke(running, "event_search", {"run_id": chain.run_id, "actions": ["network.", "dns.", "http.", "icmp."], "source_kinds": ["zeek", "dataset"], "limit": 60 if quick else 200})
         session_data = {"sessions": [], "count": 0} if quick else self._invoke(running, "session_lookup", {"run_id": chain.run_id, "session_type": "network", "limit": 100})

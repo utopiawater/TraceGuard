@@ -46,7 +46,7 @@ const navigation: NavSection[] = [
     label: '威胁分析',
     icon: ShieldCheck,
     children: [
-      { label: '安全知识图谱', to: '/graph', icon: Boxes },
+      { label: '安全实体视图', to: '/graph', icon: Boxes },
       { label: 'ATT&CK 分析', to: '/attack', icon: ShieldCheck },
       { label: '威胁归因', to: '/attribution', icon: Fingerprint },
     ],

@@ -814,3 +814,4 @@ tbody tr:hover{
   .brand{height:68px}
   .sidebar-nav{padding-top:9px}
 }
+.pagination-bar{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:10px;font-size:12px;color:var(--muted)}.pagination-bar span{margin-right:auto}.pagination-bar .secondary-action{min-height:32px;padding:6px 10px}

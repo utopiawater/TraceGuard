@@ -31,6 +31,22 @@ powershell -ExecutionPolicy Bypass -File .\scripts\stop.ps1
 
 `check.ps1` verifies Python/OpenSSL, Python packages, `.env`, non-secret LLM configuration, Neo4j, SQLite, FastAPI, frontend, and LLM reachability. Its output includes only whether an API Key is configured; it never prints the Key.
 
+`start.ps1` expects Neo4j to be available on Bolt port `7687`. If Docker is unavailable but the bundled local runtime exists, start Neo4j first:
+
+```powershell
+Start-Process -FilePath ".\.runtime\neo4j-community-5.26.30\bin\neo4j.bat" -ArgumentList @("console") -WorkingDirectory ".\.runtime\neo4j-community-5.26.30" -WindowStyle Hidden -RedirectStandardOutput ".\.runtime\neo4j.stdout.log" -RedirectStandardError ".\.runtime\neo4j.stderr.log"
+powershell -ExecutionPolicy Bypass -File .\scripts\start.ps1
+```
+
+After startup, confirm graph availability:
+
+```powershell
+Invoke-RestMethod -Uri http://127.0.0.1:8000/api/system/health | ConvertTo-Json -Depth 8
+.\.venv\Scripts\python.exe scripts/demo_readiness.py --require-services
+```
+
+Expected graph state is `configured=true` and `connected=true` with `bolt://127.0.0.1:7687`.
+
 For a softer pre-defense readiness check, run:
 
 ```powershell
@@ -75,9 +91,11 @@ Expected current summary:
 - `input_records`: 20776
 - `normalized_records`: 20776
 - `failed_records`: 0
-- `detection_count`: 348
+- `detection_count`: 225 after ATT&CK over-mapping reduction
 - `chain_count`: 1
-- report: `data/dataset_e3/dataset_run_report.json`
+- report: `data/dataset_e3_generalization/dataset_run_report.json`
+
+The older `data/dataset_e3/dataset_run_report.json` snapshot may still show 348 detections. That number came before conservative ATT&CK mapping fixes for `T1055` and `T1068`; it should be treated as a historical baseline, not the current acceptance target.
 
 Ground Truth, official IOC, `attack_graph.json`, `attack_timeline.json`, and `agent_input.json` are evaluation-only and must not be used to create system Detection, ATT&CK mappings, AttackChain steps, or Agent findings.
 
@@ -94,3 +112,13 @@ Before importing the final bundle into SQLite, run a dry-run:
 ```
 
 The dry-run writes no database records, generates no Detection or AttackChain, and reports nodes, files, source types, time range, clock offsets, parseable/unparseable counts, and missing critical data.
+
+## Current Run page truthfulness
+
+The defense demo should use the global run picker as the case context. All major pages are expected to preserve the selected `run_id`:
+
+- Dashboard, Incidents, Chains, Events, Hosts, Network, ATT&CK, Agent, Attribution, Reports, Sources, Search.
+- Events, Detections, Sessions, Evidence, Chains, and Network expose pagination plus `meta.total`.
+- AttackChain loads graph data by exact `chain_id`; Evidence is loaded by exact evidence ID.
+- The former graph page is named "安全实体视图" until a complete relation graph UI is implemented.
+- Analysis completion means base tracing is complete and Agent can be started; it does not mean Attribution or Report has already run.

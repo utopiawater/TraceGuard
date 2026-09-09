@@ -156,21 +156,28 @@ def search(
                 row["artifact_ref"], "/reports", payload, term, row["run_id"], row["created_at"],
             )
 
-        if not run_id:
-            for row in connection.execute(
-                "SELECT t.task_id,t.case_id,t.agent_role,t.state,t.task_json,r.result_json FROM agent_tasks t "
-                "LEFT JOIN agent_results r ON r.task_id=t.task_id "
-                "WHERE LOWER(t.task_id) LIKE ? OR LOWER(t.case_id) LIKE ? OR LOWER(t.agent_role) LIKE ? OR LOWER(t.task_json) LIKE ? OR LOWER(COALESCE(r.result_json,'')) LIKE ? "
-                "ORDER BY t.rowid DESC LIMIT ?",
-                (needle, needle, needle, needle, needle, per_kind),
-            ).fetchall():
-                task_payload = load_json(row["task_json"])
-                result_payload = load_json(row["result_json"] or "{}")
-                payload = {"task": task_payload, "result": result_payload}
-                add_result(
-                    results, "agent", row["task_id"], "%s · %s" % (row["agent_role"], row["state"]),
-                    row["case_id"], "/agents?case=%s" % row["case_id"], payload, term,
-                )
+        for row in connection.execute(
+            "SELECT t.task_id,t.case_id,t.agent_role,t.state,t.task_json,r.result_json FROM agent_tasks t "
+            "LEFT JOIN agent_results r ON r.task_id=t.task_id "
+            "WHERE LOWER(t.task_id) LIKE ? OR LOWER(t.case_id) LIKE ? OR LOWER(t.agent_role) LIKE ? OR LOWER(t.task_json) LIKE ? OR LOWER(COALESCE(r.result_json,'')) LIKE ? "
+            "ORDER BY t.rowid DESC LIMIT ?",
+            (needle, needle, needle, needle, needle, per_kind),
+        ).fetchall():
+            task_payload = load_json(row["task_json"])
+            result_payload = load_json(row["result_json"] or "{}")
+            runtime = task_payload.get("runtime") if isinstance(task_payload.get("runtime"), dict) else {}
+            chain_id = runtime.get("chain_id")
+            agent_run_id = None
+            if chain_id:
+                chain = repo.get_chain(chain_id)
+                agent_run_id = chain.run_id if chain else None
+            if run_id and agent_run_id != run_id:
+                continue
+            payload = {"task": task_payload, "result": result_payload}
+            add_result(
+                results, "agent", row["task_id"], "%s · %s" % (row["agent_role"], row["state"]),
+                row["case_id"], "/agents?case=%s" % row["case_id"], payload, term, agent_run_id,
+            )
 
     results.sort(key=lambda item: item.get("timestamp") or "", reverse=True)
     return response(results[:limit])
