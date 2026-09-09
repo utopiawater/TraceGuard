@@ -70,9 +70,12 @@ TraceGuard 已支持的优先输入：
 
 - Sysmon XML
 - Windows Security XML
+- Windows EVTX 原始日志：Security、System、Application，经 Windows `wevtutil` 转 XML 后进入现有 Windows normalizer
 - Auditd compound text log
 - Wazuh JSON / JSONL alert
 - Zeek JSON log: conn、dns、http、files、weird、notice、icmp
+- Nginx/Web/C2 HTTP access log
+- PCAP：优先 Zeek，缺 Zeek 时可用 tshark fallback；如果两者都未安装，dry-run/正式导入会明确标记为 parser missing，不会假装支持后产生空事件
 
 如果云端只能导出 CSV 或其他格式，先保留原文件，不要手工改字段；另附 schema 说明。
 
@@ -140,7 +143,7 @@ Ground Truth manifest 只用于最终 evaluation，不进入 Detection、ATT&CK�
 .\.venv\Scripts\python.exe scripts/testbed_import_dry_run.py --bundle path\to\testbed_bundle
 ```
 
-dry-run 只审计输入，不写 SQLite、不生成 Detection、不生成 AttackChain。输出包括：
+dry-run 只审计输入，不写 SQLite、不生成 Detection、不生成 AttackChain。它与正式上传链路共享文件识别、递归解压、EVTX/PCAP 先决条件和 normalizer 能力检查。输出包括：
 
 - run manifest 中的 `scenario_id`、`run_id`、节点、时区和时间同步要求。
 - bundle 内可识别文件、数据源类型和每类 source 数量。

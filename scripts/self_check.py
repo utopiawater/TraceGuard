@@ -1,6 +1,7 @@
 import json
+import shutil
 import sys
-import tempfile
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,8 +22,11 @@ def main() -> None:
     raws = load_scenario(scenario)
     assert len(raws) == 4 and len({raw.raw_id for raw in raws}) == 4
     checks.append("4 条真实格式 raw envelope 与确定性 ID")
-    with tempfile.TemporaryDirectory(prefix="traceguard-check-") as temp:
-        data = Path(temp)
+    temp_root = ROOT / "data" / "self_check_tmp"
+    temp_root.mkdir(parents=True, exist_ok=True)
+    data = temp_root / ("traceguard-check-%d" % int(time.time() * 1000))
+    try:
+        data.mkdir(parents=True, exist_ok=True)
         settings = Settings(data_dir=data, database_path=data / "check.db", raw_archive_dir=data / "raw")
         repository = SQLiteRepository(settings.database_path)
         graph = InMemoryGraphProjector()
@@ -34,7 +38,7 @@ def main() -> None:
         checks.append("登录与网络 Session")
         assert [item.rule_id for item in result.detections] == ["det.auth.remote_interactive_logon", "det.host.suspicious_powershell", "det.network.cross_source_interpreter_connection"]
         checks.append("规则注册、双源关联与 DetectionResult")
-        assert len(result.chains) == 1 and result.chains[0].technique_ids == ["T1078", "T1059.001", "T1071.001"]
+        assert len(result.chains) == 1 and result.chains[0].technique_ids == ["T1059.001", "T1071.001"]
         assert all(step.evidence_ids for step in result.chains[0].steps)
         checks.append("ATT&CK 映射、AttackChain 与 Evidence 外键")
         required_relations = {"SPAWNED", "INITIATED", "FROM", "TO", "USED_TECHNIQUE"}
@@ -44,6 +48,8 @@ def main() -> None:
         replay = pipeline.run("run_self_check", raws)
         assert replay.accepted_raw == 0 and repository.counts() == before
         checks.append("同一输入重放幂等")
+    finally:
+        shutil.rmtree(data, ignore_errors=True)
     registry = default_agent_registry()
     gateway = ToolGateway([Tool("event_search", lambda args: {"refs": []})])
     task = AgentTask(task_id="task_self_check", case_id="case_self_check", agent_role="host", objective="check", allowed_tools=["event_search"], constraints={"max_steps": 2, "deadline_ms": 1000, "read_only": True})

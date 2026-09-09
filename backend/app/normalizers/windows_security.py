@@ -28,7 +28,10 @@ class WindowsSecurityAdapter:
             return []
         action, outcome = mapping[event_number]
         event_time = parse_timestamp(parsed["time_created"] or raw.observed_time.isoformat())
-        host = host_ref(parsed["computer"] or raw.source.host_hint, raw.source.sensor_id)
+        computer = parsed["computer"]
+        if isinstance(computer, str) and computer.lower() in {"localhost", "."}:
+            computer = raw.source.host_hint or computer
+        host = host_ref(computer or raw.source.host_hint, raw.source.sensor_id)
         user = user_ref(data.get("TargetUserName"), host.entity_id, data.get("TargetUserSid"))
         session_id = stable_id("session", host.entity_id, data.get("TargetLogonId", "unknown"))
         session_ref = EntityRef(entity_type="session", entity_id=session_id, source_ids=[data.get("TargetLogonId", "")], display_name=data.get("TargetLogonId"), attributes={"logon_type": data.get("LogonType"), "ip_address": data.get("IpAddress")}, identity_quality="exact")

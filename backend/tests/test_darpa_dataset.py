@@ -118,8 +118,9 @@ def test_darpa_normalizer_maps_process_network_and_file_samples_to_unified_schem
     assert process.actor.process and process.actor.process.attributes["subject_id"] == "11C64B2C-3DC3-11E8-A5CA-3FA3753A265A"
     assert network.action == "network.connect"
     assert network.network and network.network.dst.ip == "76.56.184.25" and network.network.dst.port == 80
-    assert file_event.action == "process.execute"
-    assert file_event.object.ref and file_event.object.ref.attributes["normalized_path"] == "/tmp/tmux-1002"
+    assert file_event.action == "process.start"
+    assert file_event.object.type == "process"
+    assert file_event.actor.process and "/tmp/tmux-1002" in str(file_event.actor.process.attributes.get("cmdline", ""))
     for event in (process, network, file_event):
         assert event.model_dump()
         assert "attack_label" not in event.model_dump_json()
@@ -326,9 +327,9 @@ def test_darpa_fixture_adapter_maps_core_process_network_and_file_fields():
     assert network.network.dst.port == 80
     assert network.network.application == "http"
 
-    assert file_event.action == "process.execute"
-    assert file_event.object.ref
-    assert file_event.object.ref.attributes["normalized_path"] == "/tmp/fixture-loader"
+    assert file_event.action == "process.start"
+    assert file_event.object.type == "process"
+    assert file_event.object.ref and "/tmp/fixture-loader" in str(file_event.object.ref.attributes.get("cmdline", ""))
 
 
 def test_darpa_fixture_pipeline_produces_evidence_without_real_dataset(tmp_path):

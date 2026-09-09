@@ -34,7 +34,7 @@ Collector / Replay / DARPA Dataset
 - Windows Security、Sysmon、Auditd、Wazuh、Zeek adapter 已接入统一主管道。
 - `backend/fixtures/scenarios/full_attack_chain` 可生成带 Evidence 的七阶段课程演示链。
 - SQLite repository 已支持 run-scoped 事件、session、detection、evidence、chain 查询，并支持超过 5000 条事件的 SQL 过滤。
-- Detection 覆盖登录、PowerShell、端网双源连接、横向移动、权限变化、敏感文件、数据外传、注册表持久化、内存行为、DNS/HTTP/ICMP 隐蔽信道，以及本次公开数据集所需的少量通用规则。
+- Detection 覆盖登录、PowerShell、端网双源连接、横向移动、权限变化、敏感文件、数据外传、注册表持久化、内存行为、DNS/HTTP/ICMP 隐蔽信道，并补充真实靶场泛化所需的 Web 探测、HTTP C2 候选、无进程上下文的 flow 扫描、归档候选和 HTTP 客户端模拟外传候选。
 - ATT&CK knowledge 固定在 `knowledge/attack/mappings.json`，当前 T1046 名称为 `Network Service Scanning`。
 - AttackChain 仍由 `DeterministicChainBuilder` 基于 Detection 和 ATT&CK tactic 生成，不读取 Ground Truth。
 - Multi-Agent 保持六角色：Coordinator、Host、Network、Correlation、Attribution、Report。Quick scope 使用 Coordinator、Host、Network、Correlation；真实 LLM 不可用时明确记录 deterministic fallback。
@@ -69,33 +69,31 @@ Evaluation-only 文件，例如 `agent_input.json`、`dataset_analysis_report.*`
 py -3.13 scripts/replay_dataset.py --dataset datasets/darpa_tc_e3_cadets --data-dir data/dataset_e3 --run-id run_darpa_tc_e3_001 --reset --quick-investigation --agent-fallback
 ```
 
-最新 run report:
+最新泛化回归 run report:
 
-- report: `data/dataset_e3/dataset_run_report.json`
+- report: `data/dataset_e3_generalization/dataset_run_report.json`
 - input_records: 20,776
 - accepted_raw: 20,776
 - normalized_records: 20,776
 - failed_records: 0
 - mapping_rate: 1.0
 - unknown_action_count: 0
-- entity_count: 461
+- entity_count: 343
 - session_count: 16
-- detection_count: 348
+- detection_count: 225
 - evidence_count: 20,776
-- technique_ids: `T1005`, `T1046`, `T1055`, `T1059`, `T1068`, `T1071.001`
+- technique_ids: `T1005`, `T1046`, `T1071.001`
 - chain_count: 1
-- IOC coverage: 99 / 776
-- uncovered IOC analysis: 677 个未覆盖 IOC 中 651 个为 network IOC，648 个为低语义系统调用；主要由 `recvfrom`、`sendto` 和少量文件落地/权限/删除事件组成。
+- IOC coverage: 86 / 776
+- uncovered IOC analysis: 690 个未覆盖 IOC 中 651 个为 network IOC，648 个为低语义系统调用；主要由 `recvfrom`、`sendto` 和少量文件落地/权限/删除事件组成。
 - Evidence backtrace rate: 1.0
 
 当前 Dataset AttackChain 由系统 Detection 生成，关键步骤为：
 
 1. command_and_control / `T1071.001`
 2. collection / `T1005`
-3. execution / `T1059`
-4. privilege_escalation / `T1068`
 
-说明：`T1055` 仍作为 memory behavior detection 出现在 Technique 集合中，但同一 privilege stage 的链代表 detection 已优先选择 `det.host.privilege_escalation` / `T1068`，避免早期 `memory.protect` 抢占权限提升阶段。
+说明：本轮真实靶场泛化修复后，单纯 `memory.protect` 不再自动映射为 `T1055 Process Injection`，普通 `privilege.change`/Windows 4672 也不再自动映射为 `T1068 Exploitation for Privilege Escalation`。因此 CADETS 的 Technique 数从旧基线 6 种降为 3 种，这是 ATT&CK 降噪结果，不是解析回归。
 
 二分类 Precision / Recall / F1 不报告：
 
@@ -105,12 +103,20 @@ py -3.13 scripts/replay_dataset.py --dataset datasets/darpa_tc_e3_cadets --data-
 
 正式 Python 版本来自 `pyproject.toml`：`>=3.13,<3.14`。本机裸 `python` 指向 Python 3.8，不可作为正式测试环境；`xxq` conda 环境为 Python 3.11，也不符合当前项目要求。正式回归使用 `py -3.13` 或项目 `.venv`。
 
-最近一次通过的回归：
+最近一次完整通过的回归：
 
 - `py -3.13 -m pytest --basetemp data/test_tmp_closeout2`: passed，45 passed / 1 warning
 - `py -3.13 scripts/self_check.py`: passed，8 checks
 - `cd frontend; npm.cmd test`: passed，1 file / 2 tests
 - `cd frontend; npm.cmd run build`: passed
+
+2026-09-09 真实靶场泛化修复后的验证：
+
+- `py -3.13 scripts/self_check.py`: passed，8 checks
+- 关键新增回归定点测试：7 passed
+- `py -3.13 -m pytest -q --tb=short`: 当前机器上所有剩余失败均为 pytest `tmp_path` 在 `C:\Users\70568\AppData\Local\Temp\pytest-of-70568\...\ .lock` 创建被拒绝，未再出现业务断言失败。
+- `cd frontend; npm.cmd run build`: passed
+- `cd frontend; npm.cmd test -- --run`: 当前机器上 Vitest/Vite 启动 esbuild 子进程时报 `spawn EPERM`，与前端代码编译无关。
 
 正式真实 DeepSeek 验收 artifact 保留在：
 
@@ -153,7 +159,7 @@ py -3.13 scripts/demo_readiness.py
 py -3.13 scripts/testbed_import_dry_run.py --bundle path\to\testbed_bundle
 ```
 
-dry-run 不写数据库、不生成 Detection/AttackChain，只输出节点、文件、数据源、时间范围、时间偏差、可解析/不可解析数量和缺失关键数据。
+dry-run 不写数据库、不生成 Detection/AttackChain，只输出节点、文件、数据源、时间范围、时间偏差、可解析/不可解析数量和缺失关键数据。正式上传链路已支持安全递归展开 zip/tar.gz、Nginx/C2 HTTP 文本日志、Auditd、Windows EVTX 经 `wevtutil` 转 XML，以及 PCAP 经 Zeek/tshark 转 Zeek 事件；当前本机缺 Zeek/tshark，因此 PCAP 会被明确标记为 missing parser。
 
 ## 6. 对照小学期要求的剩余项
 
@@ -171,7 +177,8 @@ dry-run 不写数据库、不生成 Detection/AttackChain，只输出节点、�
 - Attribution 是候选相似性分析，不是攻击者身份确认。
 - Neo4j 图查询和前端图谱是 bounded 视图，不是无限全库图遍历。
 - PDF 报告导出未实现，当前支持 Markdown/HTML。
-- 真实云靶场尚未由本仓库直接验证；需等待同学提供日志 bundle 和 manifest。
+- 真实云靶场同学提供的 `攻击行为记录.zip` 已由本仓库直接验证一次。当前可解析 Nginx/C2 HTTP、Auditd 和 EVTX；PCAP 因本机缺 Zeek/tshark 未解析；N6 普通 syslog/auth.log 尚未进入统一 normalizer。
+- 本次真实靶场 run report: `data/testbed_upload_analysis_final/testbed_upload_run_report.json`。该目录为本地运行产物，不建议提交 Git。
 
 ## 8. 最近一次状态更新时间
 

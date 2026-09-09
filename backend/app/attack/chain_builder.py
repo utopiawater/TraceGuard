@@ -42,19 +42,10 @@ class DeterministicChainBuilder:
             predecessors = []
             if steps:
                 shared = sorted(set(steps[-1].entity_ids).intersection(detection.entity_ids))
-                previous_stage = steps[-1].stage
-                current_stage = TACTIC_STAGE.get(tactic_id, "execution")
-                relation_by_pair = {
-                    ("initial_access", "execution"): "authentication",
-                    ("execution", "command_and_control"): "network_flow",
-                    ("command_and_control", "lateral_movement"): "network_flow",
-                    ("lateral_movement", "privilege_escalation"): "identity_change",
-                    ("privilege_escalation", "collection"): "file_lineage",
-                    ("collection", "exfiltration"): "file_lineage",
-                }
+                relation = self._predecessor_relation(steps[-1], detection, shared)
                 predecessors = [StepPredecessor(
                     step_id=steps[-1].step_id,
-                    relation=relation_by_pair.get((previous_stage, current_stage), "same_session" if set(steps[-1].session_ids) & set(detection.session_ids) else "temporal"),
+                    relation=relation,
                     score=0.88 if shared else 0.68,
                     evidence_ids=sorted(set(steps[-1].evidence_ids + detection.evidence_ids)),
                 )]
@@ -93,3 +84,19 @@ class DeterministicChainBuilder:
             len(detection.evidence_ids),
             -detection.created_at.timestamp(),
         )
+
+    @staticmethod
+    def _predecessor_relation(previous: ChainStep, detection: DetectionResult, shared: List[str]) -> str:
+        if set(previous.session_ids) & set(detection.session_ids):
+            return "same_session"
+        if any(item.startswith("file_") for item in shared):
+            return "file_lineage"
+        if any(item.startswith("user_") for item in shared) and detection.rule_id in {"det.host.privilege_escalation", "det.auth.lateral_movement"}:
+            return "identity_change"
+        if detection.rule_id.startswith("det.auth."):
+            return "authentication_relation"
+        if detection.rule_id.startswith("det.network."):
+            return "network_relation" if shared else "temporal_relation"
+        if shared:
+            return "shared_entity_relation"
+        return "temporal_relation"

@@ -2,6 +2,7 @@ import csv
 import gzip
 import json
 import shutil
+import subprocess
 import tarfile
 import zipfile
 from dataclasses import dataclass
@@ -17,8 +18,18 @@ from app.core.time import parse_timestamp, utc_now
 from app.repositories import SQLiteRepository
 
 
-ALLOWED_SUFFIXES = {".log", ".json", ".jsonl", ".csv", ".pcap", ".zip", ".tar.gz"}
-GROUND_TRUTH_MARKERS = ("attack_steps.md", "attack_timeline.json", "attack_graph.json", "labels", "ground_truth")
+ALLOWED_SUFFIXES = {".log", ".json", ".jsonl", ".csv", ".pcap", ".evtx", ".zip", ".tar.gz"}
+GROUND_TRUTH_MARKERS = (
+    "attack_steps.md",
+    "attack_timeline.json",
+    "attack_graph.json",
+    "labels",
+    "ground_truth",
+    "groundtruth",
+    "证据",
+    "说明",
+)
+MAX_EXTRACTED_BYTES = 250 * 1024 * 1024
 STAGES = [
     ("uploaded", "上传"),
     ("identified", "文件识别"),
@@ -188,6 +199,9 @@ class AnalysisTaskService:
                 for member in archive.infolist():
                     if member.is_dir():
                         continue
+                    if member.file_size > MAX_EXTRACTED_BYTES:
+                        task["identification"]["warnings"].append("文件超过安全展开大小限制，已跳过：%s" % member.filename)
+                        continue
                     output = self._safe_join(target_dir, member.filename)
                     output.parent.mkdir(parents=True, exist_ok=True)
                     with archive.open(member) as src, output.open("wb") as dst:
@@ -200,6 +214,9 @@ class AnalysisTaskService:
             with tarfile.open(path, "r:gz") as archive:
                 for member in archive.getmembers():
                     if not member.isfile():
+                        continue
+                    if member.size > MAX_EXTRACTED_BYTES:
+                        task["identification"]["warnings"].append("文件超过安全展开大小限制，已跳过：%s" % member.name)
                         continue
                     output = self._safe_join(target_dir, member.name)
                     output.parent.mkdir(parents=True, exist_ok=True)
@@ -228,6 +245,9 @@ class AnalysisTaskService:
         if lowered.endswith(".pcap"):
             parser = shutil.which("zeek") or shutil.which("tshark")
             return RecognizedFile(path, "PCAP", SourceKind.zeek if parser else None, "pcap", "pcap_ref", 1, "pcap capture", parser_status="ready" if parser else "missing_parser")
+        if lowered.endswith(".evtx"):
+            parser = shutil.which("wevtutil")
+            return RecognizedFile(path, "Windows EVTX", SourceKind.windows_security if parser else None, "windows.evtx", "evtx", 1, "Windows EVTX event log", parser_status="ready" if parser else "missing_parser")
         sample = self._sample(path)
         if "<Event" in sample:
             if "Microsoft-Windows-Sysmon" in sample or lowered.startswith("sysmon_") or any("<EventID>%s</EventID>" % event_id in sample for event_id in (1, 3, 5, 8, 10, 11, 12, 13, 14, 15, 22, 23, 25, 26)):
@@ -237,7 +257,8 @@ class AnalysisTaskService:
         if "type=SYSCALL msg=audit(" in sample or " msg=audit(" in sample:
             return RecognizedFile(path, "Auditd", SourceKind.auditd, "auditd.compound", "text", 1, "Linux audit log")
         if lowered in {"conn.log", "dns.log", "http.log", "files.log", "weird.log", "notice.log"} or lowered.startswith("zeek_"):
-            return RecognizedFile(path, "Zeek", SourceKind.zeek, self._zeek_dataset(lowered), "json" if lowered.endswith(".json") else "csv", self._count_records(path), "Zeek log")
+            json_suffix = lowered.endswith((".json", ".jsonl", ".ndjson"))
+            return RecognizedFile(path, "Zeek", SourceKind.zeek, self._zeek_dataset(lowered), "json" if json_suffix else "csv", self._count_records(path), "Zeek log")
         if lowered in {"process_events.json", "network_events.json", "file_events.json"}:
             return RecognizedFile(path, "标准化数据集", SourceKind.dataset, "darpa_tc_e3_cadets", "json", self._count_records(path), "standard dataset event file")
         if self._looks_like_json(path):
@@ -246,7 +267,7 @@ class AnalysisTaskService:
             if dataset:
                 return dataset
         if lowered.endswith(".csv") or self._looks_like_web_log(sample):
-            dataset = "web.nginx" if self._looks_like_web_log(sample) else "generic.csv"
+            dataset = "c2.http" if "c2" in lowered else "web.nginx" if self._looks_like_web_log(sample) else "generic.csv"
             return RecognizedFile(path, "Nginx/Web日志", SourceKind.application, dataset, "csv" if lowered.endswith(".csv") else "text", self._count_records(path), "web access log")
         return RecognizedFile(path, "Unknown", None, None, "text", 0, "unrecognized")
 
@@ -260,16 +281,25 @@ class AnalysisTaskService:
             kind = SourceKind(item["source_kind"])
             dataset = item.get("dataset")
             for index, payload in enumerate(self._payloads(path, item["payload_format"], dataset)):
+                payload = dict(payload) if isinstance(payload, dict) else payload
+                record_dataset = payload.pop("_dataset", dataset) if isinstance(payload, dict) else dataset
+                record_kind = self._windows_kind_from_xml(payload, kind)
                 event_time_raw = self._event_time(payload)
                 observed = parse_timestamp(event_time_raw) if event_time_raw is not None else utc_now()
                 record_id = "%s:%s:%d" % (task["task_id"], path.name, index)
-                source = SourceDescriptor(kind=kind, product=self._product(kind, dataset), dataset=dataset, sensor_id=self._sensor_id(path, payload, kind), host_hint=self._host_hint(payload), source_record_id=record_id)
-                raws.append(envelope_from_payload(source, payload, item["payload_format"] if item["payload_format"] != "xml" else "text", event_time_raw, "analysis://%s/%s#%d" % (task["task_id"], item["path"], index), observed, {"analysis_task_id": task["task_id"], "uploaded_file": task["upload"]["filename"]}))
+                host_hint = self._host_hint(payload)
+                if host_hint and host_hint.lower() in {"localhost", "."}:
+                    host_hint = self._host_hint_from_path(path) or host_hint
+                source = SourceDescriptor(kind=record_kind, product=self._product(record_kind, record_dataset), dataset=record_dataset, sensor_id=self._sensor_id(path, payload, record_kind), host_hint=host_hint or self._host_hint_from_path(path), source_record_id=record_id)
+                payload_format = "json" if item["payload_format"] == "pcap_ref" else "xml" if item["payload_format"] == "evtx" else item["payload_format"]
+                raws.append(envelope_from_payload(source, payload, payload_format, event_time_raw, "analysis://%s/%s#%d" % (task["task_id"], item["path"], index), observed, {"analysis_task_id": task["task_id"], "uploaded_file": task["upload"]["filename"]}))
         return raws
 
     def _payloads(self, path: Path, payload_format: str, dataset: Optional[str]) -> Iterable[Any]:
         if payload_format == "pcap_ref":
-            return []
+            return list(self._pcap_payloads(path))
+        if payload_format == "evtx":
+            return list(self._evtx_payloads(path))
         if payload_format in {"text", "xml"}:
             return [path.read_text(encoding="utf-8", errors="replace")]
         if payload_format == "csv" and dataset and dataset.startswith("zeek."):
@@ -297,6 +327,64 @@ class AnalysisTaskService:
         with path.open("r", encoding="utf-8", errors="replace", newline="") as handle:
             for row in csv.DictReader(handle):
                 yield dict(row)
+
+    def _pcap_payloads(self, path: Path) -> Iterable[dict]:
+        zeek = shutil.which("zeek")
+        if zeek:
+            temp_root = getattr(self, "root", path.parent) / "pcap_tmp"
+            temp_root.mkdir(parents=True, exist_ok=True)
+            out_dir = temp_root / stable_id("pcap", path.name)
+            if out_dir.exists():
+                shutil.rmtree(out_dir, ignore_errors=True)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                command = [zeek, "-C", "-r", str(path), "LogAscii::use_json=T"]
+                proc = subprocess.run(command, cwd=out_dir, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
+                if proc.returncode != 0:
+                    raise ValueError("PCAP Zeek parse failed: %s" % (proc.stderr.strip() or proc.stdout.strip()))
+                for log_path in sorted(out_dir.glob("*.log")):
+                    dataset = self._zeek_dataset(log_path.name)
+                    for line in log_path.read_text(encoding="utf-8", errors="replace").splitlines():
+                        if not line.strip() or line.startswith("#"):
+                            continue
+                        try:
+                            row = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        row["_dataset"] = dataset
+                        yield row
+            finally:
+                shutil.rmtree(out_dir, ignore_errors=True)
+            return
+        tshark = shutil.which("tshark")
+        if not tshark:
+            raise ValueError("PCAP parser prerequisite missing: install Zeek or tshark")
+        fields = ["frame.time_epoch", "ip.src", "ip.dst", "tcp.srcport", "udp.srcport", "tcp.dstport", "udp.dstport", "_ws.col.Protocol", "frame.len"]
+        command = [tshark, "-r", str(path), "-T", "fields", "-E", "separator=\t"]
+        for field in fields:
+            command.extend(["-e", field])
+        proc = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
+        if proc.returncode != 0:
+            raise ValueError("PCAP tshark parse failed: %s" % (proc.stderr.strip() or proc.stdout.strip()))
+        for index, line in enumerate(proc.stdout.splitlines()):
+            parts = line.split("\t")
+            if len(parts) < len(fields) or not parts[1] or not parts[2]:
+                continue
+            src_port = parts[3] or parts[4] or None
+            dst_port = parts[5] or parts[6] or None
+            proto = "udp" if parts[4] or parts[6] else "tcp" if parts[3] or parts[5] else "icmp" if "ICMP" in parts[7].upper() else "other"
+            yield {"_dataset": "zeek.conn", "ts": float(parts[0]), "uid": stable_id("pcap", path.name, index), "id.orig_h": parts[1], "id.resp_h": parts[2], "id.orig_p": int(src_port) if src_port else None, "id.resp_p": int(dst_port) if dst_port else None, "proto": proto, "orig_bytes": int(parts[8] or 0), "resp_bytes": 0}
+
+    def _evtx_payloads(self, path: Path) -> Iterable[str]:
+        parser = shutil.which("wevtutil")
+        if not parser:
+            raise ValueError("EVTX parser prerequisite missing: wevtutil is required on Windows")
+        proc = subprocess.run([parser, "qe", str(path), "/lf:true", "/f:xml"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
+        if proc.returncode != 0:
+            raise ValueError("EVTX parse failed: %s" % (proc.stderr.strip() or proc.stdout.strip()))
+        import re
+        for match in re.finditer(r"<Event\b.*?</Event>", proc.stdout, flags=re.S):
+            yield match.group(0)
 
     def _result_summary(self, task_id: str, result) -> dict:
         events = self.repository.query_events(run_id=task_id, limit=50000)
@@ -392,15 +480,49 @@ class AnalysisTaskService:
     def _event_time(payload: Any) -> Optional[Any]:
         if isinstance(payload, dict):
             return payload.get("timestamp") or payload.get("ts") or payload.get("UtcTime") or payload.get("time")
+        if isinstance(payload, str) and "<Event" in payload:
+            import re
+            match = re.search(r"<TimeCreated[^>]+SystemTime=['\"]([^'\"]+)['\"]", payload)
+            return match.group(1) if match else None
         return None
 
     @staticmethod
     def _host_hint(payload: Any) -> Optional[str]:
-        return str(payload.get("host") or payload.get("hostname") or payload.get("Computer")) if isinstance(payload, dict) and (payload.get("host") or payload.get("hostname") or payload.get("Computer")) else None
+        if isinstance(payload, dict) and (payload.get("host") or payload.get("hostname") or payload.get("Computer")):
+            return str(payload.get("host") or payload.get("hostname") or payload.get("Computer"))
+        if isinstance(payload, str) and "<Event" in payload:
+            import re
+            match = re.search(r"<Computer>(.*?)</Computer>", payload)
+            return match.group(1) if match else None
+        return None
+
+    @staticmethod
+    def _host_hint_from_path(path: Path) -> Optional[str]:
+        name = path.stem.lower()
+        if name.startswith("n7_"):
+            return "n7-office"
+        if name.startswith("n8_"):
+            return "n8-core"
+        if name.startswith("n4_"):
+            return "n4-web"
+        if "c2" in name:
+            return "c2"
+        return None
+
+    @staticmethod
+    def _windows_kind_from_xml(payload: Any, fallback: SourceKind) -> SourceKind:
+        if not isinstance(payload, str) or "<Event" not in payload:
+            return fallback
+        lowered = payload.lower()
+        if "microsoft-windows-sysmon" in lowered or "<channel>microsoft-windows-sysmon/operational</channel>" in lowered:
+            return SourceKind.sysmon
+        return SourceKind.windows_security
 
     @staticmethod
     def _sensor_id(path: Path, payload: Any, kind: SourceKind) -> str:
         host = AnalysisTaskService._host_hint(payload)
+        if host and host.lower() in {"localhost", "."}:
+            host = AnalysisTaskService._host_hint_from_path(path) or host
         return "%s:%s" % (kind.value, (host or path.stem).lower())
 
     @staticmethod

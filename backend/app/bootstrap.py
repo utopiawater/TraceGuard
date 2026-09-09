@@ -5,10 +5,11 @@ from app.attack import DeterministicChainBuilder
 from app.core.settings import Settings
 from app.detection import DetectionEngine, RuleRegistry
 from app.detection.covert import DnsTunnelRule, HttpCovertChannelRule, IcmpTunnelRule
-from app.detection.rules import (CrossSourceNetworkRule, DataExfiltrationRule, LateralMovementRule,
-    MemoryTamperingRule, NetworkServiceScanningRule, PrivilegeEscalationRule, RegistryPersistenceRule,
+from app.detection.rules import (ArchiveCollectedDataRule, CrossSourceNetworkRule, DataExfiltrationRule,
+    FlowNetworkServiceScanningRule, HttpC2CandidateRule, LateralMovementRule, MemoryTamperingRule,
+    NetworkServiceScanningRule, PrivilegeEscalationRule, RegistryPersistenceRule,
     ServiceProcessExternalConnectionRule, RemoteInteractiveLogonRule, SensitiveFileCollectionRule,
-    SuspiciousPowerShellRule, TempDirectoryExecutionRule)
+    SuspiciousHttpClientTransferRule, SuspiciousPowerShellRule, TempDirectoryExecutionRule, WebProbingRule)
 from app.entities import EntityResolver
 from app.graph import InMemoryGraphProjector, RuntimeGraphProjector
 from app.ingestion import IngestionService, RawArchive
@@ -34,6 +35,8 @@ def build_pipeline(settings: Settings, repository: Optional[SQLiteRepository] = 
         LateralMovementRule(), PrivilegeEscalationRule(), SensitiveFileCollectionRule(),
         DataExfiltrationRule(), RegistryPersistenceRule(), MemoryTamperingRule(),
         TempDirectoryExecutionRule(), ServiceProcessExternalConnectionRule(), NetworkServiceScanningRule(),
+        FlowNetworkServiceScanningRule(), HttpC2CandidateRule(), WebProbingRule(),
+        ArchiveCollectedDataRule(), SuspiciousHttpClientTransferRule(),
         DnsTunnelRule(), HttpCovertChannelRule(), IcmpTunnelRule(),
     ])
     return AnalysisPipeline(

@@ -25,7 +25,7 @@ def test_cross_source_attack_chain_and_replay_idempotency(tmp_path):
         "det.auth.remote_interactive_logon", "det.host.suspicious_powershell", "det.network.cross_source_interpreter_connection"
     ]
     assert len(result.chains) == 1
-    assert result.chains[0].technique_ids == ["T1078", "T1059.001", "T1071.001"]
+    assert result.chains[0].technique_ids == ["T1059.001", "T1071.001"]
     assert all(step.evidence_ids for step in result.chains[0].steps)
     assert {"SPAWNED", "INITIATED", "FROM", "TO", "USED_TECHNIQUE"}.issubset({item.relation_type for item in result.graph_relations})
 

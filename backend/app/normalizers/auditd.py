@@ -52,6 +52,19 @@ def parse_audit_groups(payload: str) -> List[Dict[str, Any]]:
     return list(groups.values())
 
 
+def _selected_path(paths: List[Dict[str, Any]]) -> Optional[str]:
+    if not paths:
+        return None
+    candidates = [
+        item for item in paths
+        if item.get("name") and str(item.get("name")) not in {"(null)", "null"} and "ld-linux" not in str(item.get("name"))
+    ]
+    if not candidates:
+        return paths[0].get("name")
+    preferred = [item for item in candidates if str(item.get("nametype") or "").upper() in {"CREATE", "DELETE", "NORMAL", "PARENT"}] or candidates
+    return max(preferred, key=lambda item: (len(str(item.get("name") or "")), int(item.get("item") or 0))).get("name")
+
+
 class AuditdAdapter:
     name = "auditd"
     version = "1.1.0"
@@ -86,7 +99,7 @@ class AuditdAdapter:
         syscall_name = str(syscall.get("syscall") or "").lower()
         name_map = {"59": "execve", "257": "openat", "87": "unlink", "263": "unlinkat", "82": "rename", "90": "chmod", "105": "setuid", "106": "setgid", "42": "connect"}
         syscall_name = name_map.get(syscall_name, syscall_name)
-        path = paths[0].get("name") if paths else None
+        path = _selected_path(paths)
         action, object_type, object_ref = "process.start", "process", process
         if syscall_name in {"open", "openat", "creat"}:
             flags = str(syscall.get("a1") or syscall.get("flags") or "").lower()

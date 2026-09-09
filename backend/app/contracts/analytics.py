@@ -74,7 +74,7 @@ class Alert(ContractModel):
 
 class StepPredecessor(ContractModel):
     step_id: str
-    relation: Literal["temporal", "spawn", "same_session", "authentication", "network_flow", "file_lineage", "identity_change", "analyst_link"]
+    relation: Literal["temporal", "spawn", "same_session", "authentication", "network_flow", "file_lineage", "identity_change", "analyst_link", "temporal_relation", "shared_entity_relation", "process_parent_relation", "network_relation", "authentication_relation", "inferred_relation"]
     score: float = Field(ge=0, le=1)
     evidence_ids: List[str] = Field(default_factory=list)
 
@@ -119,4 +119,3 @@ class AttackChain(ContractModel):
     uncertainties: List[str] = Field(default_factory=list)
     evidence_ids: List[str]
     algorithm_version: str
-

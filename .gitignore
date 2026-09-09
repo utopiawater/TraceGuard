@@ -98,7 +98,16 @@ data/reports/*
 data/analysis_tasks/*
 data/dataset_*/raw/*
 data/dataset_*/reports/*
+data/dataset_e3_generalization/
 data/test_tmp_*/
+data/self_check_tmp/
+data/pytest_tmp/
+data/manual_generalization_checks*/
+data/testbed_analysis/
+data/testbed_bundles/
+data/testbed_dry_run_tmp/
+data/testbed_upload_analysis/
+data/testbed_upload_analysis_final/
 
 # 如果以后需要保留空目录，可以放 .gitkeep
 !data/raw/.gitkeep

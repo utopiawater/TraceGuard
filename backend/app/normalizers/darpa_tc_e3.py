@@ -16,7 +16,7 @@ ACTION_MAP = {
     "aue_chmod": "file.modify",
     "aue_close": "file.close",
     "aue_connect": "network.connect",
-    "aue_execve": "process.execute",
+    "aue_execve": "process.start",
     "aue_exit": "process.stop",
     "aue_fcntl": "process.activity",
     "aue_fork": "process.start",
@@ -44,7 +44,7 @@ ACTION_MAP = {
 }
 
 NETWORK_ACTIONS = {"network.accept", "network.connect", "network.receive", "network.send"}
-FILE_ACTIONS = {"file.close", "file.delete", "file.modify", "file.open", "file.read", "file.seek", "file.write", "memory.map", "process.execute"}
+FILE_ACTIONS = {"file.close", "file.delete", "file.modify", "file.open", "file.read", "file.seek", "file.write", "memory.map", "process.start"}
 
 
 class DarpaTcE3CadetsAdapter:
@@ -138,7 +138,7 @@ class DarpaTcE3CadetsAdapter:
 
     def _object_ref(self, host_id: str, row: Dict[str, Any], action: str, subject_process: Optional[EntityRef]) -> Tuple[Optional[EntityRef], Optional[str]]:
         if action in FILE_ACTIONS:
-            if action == "process.execute" and row.get("object_path"):
+            if action == "process.start" and row.get("object_path"):
                 return file_ref(host_id, row.get("object_path")), "file"
             if action.startswith("file.") or action == "memory.map":
                 return file_ref(host_id, row.get("object_path")), "file"
