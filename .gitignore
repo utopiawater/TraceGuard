@@ -95,6 +95,7 @@ pnpm-debug.log*
 
 data/raw/*
 data/reports/*
+data/analysis_tasks/*
 data/dataset_*/raw/*
 data/dataset_*/reports/*
 data/test_tmp_*/

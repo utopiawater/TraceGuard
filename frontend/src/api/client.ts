@@ -24,3 +24,11 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<ApiEnvel
   if (!result.ok) throw new ApiError(result.status, `请求失败（${result.status}）`)
   return result.json() as Promise<ApiEnvelope<T>>
 }
+
+export async function apiUpload<T>(path: string, file: File): Promise<ApiEnvelope<T>> {
+  const form = new FormData()
+  form.append('file', file)
+  const result = await fetch(path, { method: 'POST', headers: { Accept: 'application/json' }, body: form })
+  if (!result.ok) throw new ApiError(result.status, `请求失败（${result.status}）`)
+  return result.json() as Promise<ApiEnvelope<T>>
+}

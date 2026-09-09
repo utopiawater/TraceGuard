@@ -173,11 +173,13 @@ function applyNodeFocus(cy: cytoscape.Core, node: cytoscape.NodeSingular) {
 }
 
 export function ChainPage() {
-  const { data: chains, error, loading } = useApi<Chain[]>('/api/chains')
-  const { data: graph } = useApi<Graph>('/api/graph')
-  const { data: evidence } = useApi<Evidence[]>('/api/evidence?limit=500')
-  const { data: attack } = useApi<AttackTechnique[]>('/api/attack')
   const [params] = useSearchParams()
+  const runId = params.get('run_id')
+  const scoped = runId ? `run_id=${encodeURIComponent(runId)}` : ''
+  const { data: chains, error, loading } = useApi<Chain[]>(`/api/chains${scoped ? `?${scoped}` : ''}`)
+  const { data: graph } = useApi<Graph>(`/api/graph${scoped ? `?${scoped}` : ''}`)
+  const { data: evidence } = useApi<Evidence[]>(`/api/evidence?limit=500${scoped ? `&${scoped}` : ''}`)
+  const { data: attack } = useApi<AttackTechnique[]>(`/api/attack${scoped ? `?${scoped}` : ''}`)
   const requested = params.get('chain')
   const requestedEvidence = params.get('evidence')
   const chain = chains?.find(item=>item.chain_id===requested) ?? (chains ? [...chains].sort((a,b)=>b.completeness-a.completeness||Date.parse(b.end_time)-Date.parse(a.end_time))[0] : undefined)

@@ -14,7 +14,7 @@ from app.graph import InMemoryGraphProjector, RuntimeGraphProjector
 from app.ingestion import IngestionService, RawArchive
 from app.ingestion.pipeline import AnalysisPipeline
 from app.knowledge import AttackMappingRegistry, MappingFileProvider
-from app.normalizers import AuditdAdapter, DarpaTcE3CadetsAdapter, NormalizerRegistry, SampleAttackDatasetAdapter, SysmonAdapter, WindowsSecurityAdapter, WazuhAdapter, ZeekAdapter
+from app.normalizers import ApplicationWebAdapter, AuditdAdapter, DarpaTcE3CadetsAdapter, NormalizerRegistry, SampleAttackDatasetAdapter, SysmonAdapter, WindowsSecurityAdapter, WazuhAdapter, ZeekAdapter
 from app.normalizers.pending import DatasetAdapter
 from app.repositories import SQLiteRepository
 from app.sessions import Sessionizer
@@ -27,7 +27,7 @@ def build_pipeline(settings: Settings, repository: Optional[SQLiteRepository] = 
     provider = MappingFileProvider(Path(__file__).parents[2] / "knowledge" / "attack" / "mappings.json")
     normalizers = NormalizerRegistry([
         SysmonAdapter(), WindowsSecurityAdapter(), ZeekAdapter(), WazuhAdapter(), AuditdAdapter(),
-        DarpaTcE3CadetsAdapter(), SampleAttackDatasetAdapter(), DatasetAdapter(),
+        DarpaTcE3CadetsAdapter(), SampleAttackDatasetAdapter(), ApplicationWebAdapter(), DatasetAdapter(),
     ])
     rules = RuleRegistry([
         RemoteInteractiveLogonRule(), SuspiciousPowerShellRule(), CrossSourceNetworkRule(),

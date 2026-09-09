@@ -1,12 +1,16 @@
 import { EmptyState } from './EmptyState'
 import { PageHeader } from './PageHeader'
 import { useApi } from '../hooks/useApi'
+import { useSearchParams } from 'react-router-dom'
 
 type Row = Record<string, unknown>
 
 export function ResourcePage({ title, description, endpoint, columns }: { title: string; description: string; endpoint: string; columns: [string,string][] }) {
-  const { data, meta, loading, error } = useApi<Row[]>(endpoint)
-  return <><PageHeader title={title} description={description} />
+  const [params] = useSearchParams()
+  const runId = params.get('run_id')
+  const scopedEndpoint = runId ? `${endpoint}${endpoint.includes('?') ? '&' : '?'}run_id=${encodeURIComponent(runId)}` : endpoint
+  const { data, meta, loading, error } = useApi<Row[]>(scopedEndpoint)
+  return <><PageHeader title={title} description={description} aside={runId ? <span className="freshness">任务 {runId}</span> : undefined} />
     {loading && <div className="skeleton-list" aria-label="正在加载"><span/><span/><span/></div>}
     {error && <EmptyState kind="error" title="无法读取该资源" detail={`${error}。系统不会用模拟数据替代失败结果。`} />}
     {!loading && !error && data?.length === 0 && <EmptyState title="当前没有可展示的数据" detail={meta?.warnings[0] ?? '接入对应数据源或调整筛选范围后，记录会出现在这里。'} />}

@@ -6,8 +6,10 @@ from .auditd import AuditdAdapter
 from .wazuh import WazuhAdapter
 from .darpa_tc_e3 import DarpaTcE3CadetsAdapter
 from .sample_attack_dataset import SampleAttackDatasetAdapter
+from .application import ApplicationWebAdapter
 
 __all__ = [
     "NormalizerRegistry", "SysmonAdapter", "WindowsSecurityAdapter", "ZeekAdapter",
     "AuditdAdapter", "WazuhAdapter", "DarpaTcE3CadetsAdapter", "SampleAttackDatasetAdapter",
+    "ApplicationWebAdapter",
 ]

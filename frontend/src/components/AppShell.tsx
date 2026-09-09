@@ -1,4 +1,4 @@
-import { Activity, BellRing, Bot, Boxes, Braces, ChevronDown, Database, FileText, Fingerprint, GitBranch, HardDrive, LayoutDashboard, Menu, Network, Radar, Search, ServerCog, ShieldCheck, X } from 'lucide-react'
+import { Activity, BellRing, Bot, Boxes, Braces, ChevronDown, Database, FileText, Fingerprint, GitBranch, HardDrive, LayoutDashboard, Menu, Network, Radar, Search, ServerCog, ShieldCheck, UploadCloud, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
@@ -56,6 +56,7 @@ const navigation: NavSection[] = [
     icon: Database,
     children: [
       { label: '数据源与资产', to: '/sources', icon: ServerCog },
+      { label: '在线分析', to: '/analysis', icon: UploadCloud },
       { label: '数据集实验', to: '/datasets', icon: Database },
     ],
   },

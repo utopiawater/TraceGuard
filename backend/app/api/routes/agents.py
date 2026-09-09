@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Dict, List
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 
@@ -29,10 +31,15 @@ def _task_view(record: dict) -> dict:
 
 
 @router.get("/agents")
-def agents(repo: SQLiteRepository = Depends(repository)) -> dict:
+def agents(run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository)) -> dict:
     grouped: Dict[str, List[dict]] = {}
     for record in repo.list_agent_records(2000):
         view = _task_view(record)
+        if run_id:
+            chain_id = view.get("chain_id")
+            chain = repo.get_chain(chain_id) if chain_id else None
+            if not chain or chain.run_id != run_id:
+                continue
         grouped.setdefault(view["case_id"], []).append(view)
     values = []
     for case_id, tasks in grouped.items():
@@ -66,12 +73,16 @@ def agent_detail(case_id: str, repo: SQLiteRepository = Depends(repository)) -> 
 
 
 @router.get("/attribution")
-def attribution(repo: SQLiteRepository = Depends(repository)) -> dict:
+def attribution(run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository)) -> dict:
     values = []
     for record in repo.list_agent_records(2000):
         if record["task"]["agent_role"] != "attribution" or not record.get("result"):
             continue
         view = _task_view(record)
+        if run_id:
+            chain = repo.get_chain(view.get("chain_id")) if view.get("chain_id") else None
+            if not chain or chain.run_id != run_id:
+                continue
         artifact = view["artifact"]
         candidates = artifact.get("candidates") or [{
             "candidate": artifact.get("label", "无法可靠归因"), "similarity": 0,
@@ -96,10 +107,12 @@ def attribution(repo: SQLiteRepository = Depends(repository)) -> dict:
 
 
 @router.get("/reports")
-def reports(limit: int = Query(default=100, ge=1, le=500), repo: SQLiteRepository = Depends(repository)) -> dict:
+def reports(limit: int = Query(default=100, ge=1, le=500), run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository)) -> dict:
     values = []
     records = repo.list_agent_records(2000)
     for item in repo.list_reports(limit):
+        if run_id and item["run_id"] != run_id:
+            continue
         chain_id = next((record["runtime"].get("chain_id") for record in records if record["task"]["case_id"] == item["case_id"] and record["runtime"].get("chain_id")), None)
         values.append({**item, "attack_chain": chain_id, "agent_investigation": item["case_id"], "view_url": "/api/reports/%s" % item["report_id"], "export_url": "/api/reports/%s/export" % item["report_id"]})
     return response(values, [] if values else ["尚无 Report Agent 持久化的真实报告。"])
