@@ -1,27 +1,29 @@
 import { ResourcePage } from '../components/ResourcePage'
 import { EmptyState } from '../components/EmptyState'
 import { PageHeader } from '../components/PageHeader'
+import { useAnalysis } from '../context/AnalysisContext'
 import { useApi } from '../hooks/useApi'
 import { pct } from '../lib/display'
 import { Link, useSearchParams } from 'react-router-dom'
 
-export const IncidentsPage=()=> <ResourcePage title="攻击事件中心" description="审阅确定性检测、置信度、ATT&CK 映射与证据数量。" endpoint="/api/detections" columns={[["title","事件"],["severity","严重度"],["confidence","置信度"],["attack_mappings.0.subtechnique_id|attack_mappings.0.technique_id","ATT&CK"],["rule_id","规则"],["created_at","发生时间"]]}/>
-export const GraphPage=()=> <ResourcePage title="安全知识图谱" description="查看规范化实体与有证据引用的行为关系。" endpoint="/api/entities" columns={[["display_name","实体"],["entity_type","类型"],["first_seen","首次出现"],["last_seen","最后出现"]]}/>
-export const HostsPage=()=> <ResourcePage title="主机行为分析" description="围绕登录会话、进程树、文件、注册表、权限和内存行为调查。" endpoint="/api/hosts" columns={[["hostname","主机"],["logins","登录"],["process","进程"],["file","文件"],["registry","注册表"],["privilege","权限"],["memory","内存"],["last_seen","最后活动"]]}/>
-export const NetworkPage=()=> <ResourcePage title="网络流量分析" description="按 Zeek UID 与五元组检查 DNS、HTTP、ICMP、C2 和跨源会话。" endpoint="/api/network" columns={[["event_time","时间"],["source","来源"],["action","动作"],["transport","协议"],["application","应用"],["src","源端"],["dst","目标端"],["bytes_sent","发送字节"]]}/>
-export const EventsPage=()=> <ResourcePage title="日志与安全事件" description="检索统一事件并沿 provenance 回查原始记录。" endpoint="/api/events" columns={[["event_time","事件时间"],["source.kind","来源"],["host.display_name","主机"],["action","动作"],["event_type","类型"],["message","摘要"],["provenance.parser_name","解析器"]]}/>
-export const AttackPage=()=> <ResourcePage title="ATT&CK 分析" description="查看固定版本的 Technique 覆盖、映射规则与证据数量。" endpoint="/api/attack" columns={[["technique_id","Technique"],["technique_name","名称"],["detection_count","检测"],["evidence_count","证据"],["attack_version","版本"]]}/>
+export const IncidentsPage=()=> <ResourcePage title="攻击事件中心" description="当前 run 的 Detection：规则、置信度、ATT&CK 映射与 Evidence 引用。" endpoint="/api/detections" columns={[["title","事件"],["severity","严重度"],["confidence","置信度"],["attack_mappings.0.subtechnique_id|attack_mappings.0.technique_id","ATT&CK"],["rule_id","规则"],["created_at","发生时间"]]}/>
+export const GraphPage=()=> <ResourcePage title="安全知识图谱" description="当前 run 的规范化实体与有 Evidence 引用的行为关系。" endpoint="/api/entities" columns={[["display_name","实体"],["entity_type","类型"],["first_seen","首次出现"],["last_seen","最后出现"]]}/>
+export const HostsPage=()=> <ResourcePage title="主机行为分析" description="当前 run 按资产聚合进程、文件、登录、权限和内存行为。" endpoint="/api/hosts" columns={[["hostname","主机"],["logins","登录"],["process","进程"],["file","文件"],["registry","注册表"],["privilege","权限"],["memory","内存"],["last_seen","最后活动"]]}/>
+export const NetworkPage=()=> <ResourcePage title="网络流量分析" description="当前 run 的 flow、DNS、HTTP、ICMP 和主机通信关系。" endpoint="/api/network" columns={[["event_time","时间"],["source","来源"],["action","动作"],["transport","协议"],["application","应用"],["src","源端"],["dst","目标端"],["bytes_sent","发送字节"]]}/>
+export const EventsPage=()=> <ResourcePage title="日志与安全事件" description="当前 run 的 UnifiedSecurityEvent 与 Evidence 回查入口。" endpoint="/api/events" columns={[["event_time","事件时间"],["source.kind","来源"],["host.display_name","主机"],["action","动作"],["event_type","类型"],["message","摘要"],["provenance.parser_name","解析器"]]}/>
+export const AttackPage=()=> <ResourcePage title="ATT&CK 分析" description="当前 run 的 Technique 汇总、映射规则与 Evidence 数量。" endpoint="/api/attack" columns={[["technique_id","Technique"],["technique_name","名称"],["detection_count","检测"],["evidence_count","证据"],["attack_version","版本"]]}/>
 export const SourcesPage=()=> <ResourcePage title="数据源与资产" description="检查传感器、最后事件、时间质量、dead-letter 与资产覆盖。" endpoint="/api/sources" columns={[["sensor_id","传感器"],["kind","来源"],["dataset","数据集"],["status","状态"],["last_event_time","最后事件"]]}/>
 
 interface SearchResult { type:string;type_label:string;id:string;title:string;subtitle:string;href:string;run_id?:string|null;timestamp?:string|null;match:string }
 
 export const SearchPage=()=> {
   const [params] = useSearchParams()
+  const { currentRunId: runId } = useAnalysis()
   const query = params.get('q')?.trim() ?? ''
-  const endpoint = query ? `/api/search?q=${encodeURIComponent(query)}&limit=60` : '/api/search?q=__empty__&limit=1'
+  const endpoint = query ? `/api/search?q=${encodeURIComponent(query)}&limit=60${runId ? `&run_id=${encodeURIComponent(runId)}` : ''}` : '/api/search?q=__empty__&limit=1'
   const { data, loading, error, meta } = useApi<SearchResult[]>(endpoint)
   const results = query ? data ?? [] : []
-  return <><PageHeader title="全局搜索" description="检索已入库的规范化事件、Detection、Evidence、AttackChain、Agent 调查和报告；不读取 Ground Truth 或原始密钥类配置。" aside={query ? <span className="freshness">{results.length} 条结果</span> : undefined} />
+  return <><PageHeader title="全局搜索" description="检索当前 run 的规范化事件、Detection、Evidence、AttackChain、Agent 调查和报告；不读取 Ground Truth 或原始密钥类配置。" aside={query ? <span className="freshness">{results.length} 条结果</span> : undefined} />
     {!query && <EmptyState title="输入关键词开始搜索" detail="可以搜索 IP、进程名、文件路径、Technique ID、Evidence ID、Detection ID、Case ID 或 run_id。" />}
     {query && loading && <div className="skeleton-list"><span/><span/><span/></div>}
     {query && error && <EmptyState kind="error" title="搜索失败" detail={error}/>}

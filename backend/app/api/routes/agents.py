@@ -110,9 +110,7 @@ def attribution(run_id: Optional[str] = None, repo: SQLiteRepository = Depends(r
 def reports(limit: int = Query(default=100, ge=1, le=500), run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository)) -> dict:
     values = []
     records = repo.list_agent_records(2000)
-    for item in repo.list_reports(limit):
-        if run_id and item["run_id"] != run_id:
-            continue
+    for item in repo.list_reports(limit, run_id=run_id):
         chain_id = next((record["runtime"].get("chain_id") for record in records if record["task"]["case_id"] == item["case_id"] and record["runtime"].get("chain_id")), None)
         values.append({**item, "attack_chain": chain_id, "agent_investigation": item["case_id"], "view_url": "/api/reports/%s" % item["report_id"], "export_url": "/api/reports/%s/export" % item["report_id"]})
     return response(values, [] if values else ["尚无 Report Agent 持久化的真实报告。"])

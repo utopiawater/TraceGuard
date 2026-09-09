@@ -1,0 +1,13 @@
+{
+  "patterns": [
+    "/etc/shadow",
+    "/etc/passwd",
+    "/root/.ssh/**",
+    "/home/*/.ssh/**",
+    "/data/secret/**",
+    "/srv/confidential/**",
+    "*\\sam",
+    "*\\documents\\*",
+    "*credentials*"
+  ]
+}

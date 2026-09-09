@@ -11,7 +11,7 @@ from app.core.ids import stable_id
 from app.core.time import parse_timestamp
 
 from .base import AdapterError
-from .helpers import file_ref, host_ref, ip_ref, process_ref, provenance, user_ref
+from .helpers import asset_aliases, file_ref, host_ref, ip_ref, process_ref, provenance, user_ref
 
 
 AUDIT_RE = re.compile(r"type=(?P<type>[A-Z_]+)\s+msg=audit\((?P<timestamp>\d+(?:\.\d+)?):(?P<serial>\d+)\):\s*(?P<body>.*)")
@@ -89,7 +89,7 @@ class AuditdAdapter:
         sockaddr = (records.get("SOCKADDR") or [{}])[0]
         title_record = (records.get("PROCTITLE") or [{}])[0]
         event_time = parse_timestamp(float(group["timestamp"]))
-        host = host_ref(raw.source.host_hint, raw.source.sensor_id)
+        host = host_ref(raw.source.host_hint, raw.source.sensor_id, asset_aliases(raw))
         command_args = [execve[key] for key in sorted(execve) if re.fullmatch(r"a\d+", key)]
         command = " ".join(command_args) or _decode_proctitle(title_record.get("proctitle")) or syscall.get("comm") or syscall.get("exe")
         process_epoch = raw.labels.get("boot_id") or syscall.get("ses") or "audit-unknown-start"

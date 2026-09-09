@@ -18,8 +18,23 @@ def unavailable(resource: str, dependency: str) -> dict:
 
 
 @router.get("/entities")
-def entities(projector=Depends(graph)) -> dict:
-    return response([item.model_dump(mode="json") for item in projector.entities.values()])
+def entities(run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository), projector=Depends(graph)) -> dict:
+    if not run_id:
+        return response([item.model_dump(mode="json") for item in projector.entities.values()])
+    allowed_ids = set()
+    for event in repo.query_events(run_id=run_id, limit=50000):
+        for ref in (event.host, event.actor.user, event.actor.process, event.actor.parent_process, event.object.ref):
+            if ref:
+                allowed_ids.add(ref.entity_id)
+        if event.network:
+            allowed_ids.update({value for value in (event.network.src.host_id, event.network.dst.host_id) if value})
+    for detection in repo.list_detections(50000, run_id=run_id):
+        allowed_ids.update(detection.entity_ids)
+        allowed_ids.update({mapping.subtechnique_id or mapping.technique_id for mapping in detection.attack_mappings})
+    for chain in repo.list_chains(50000, run_id=run_id):
+        allowed_ids.update(chain.entity_ids)
+        allowed_ids.update(chain.technique_ids)
+    return response([item.model_dump(mode="json") for item in projector.entities.values() if item.entity_id in allowed_ids])
 
 
 @router.get("/hosts")

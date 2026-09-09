@@ -2,6 +2,7 @@ import { Activity, BellRing, Bot, Boxes, Braces, ChevronDown, Database, FileText
 import type { LucideIcon } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useAnalysis } from '../context/AnalysisContext'
 import { useApi } from '../hooks/useApi'
 
 type NavItem = {
@@ -56,7 +57,7 @@ const navigation: NavSection[] = [
     icon: Database,
     children: [
       { label: '数据源与资产', to: '/sources', icon: ServerCog },
-      { label: '在线分析', to: '/analysis', icon: UploadCloud },
+      { label: '分析任务', to: '/analysis', icon: UploadCloud },
       { label: '数据集实验', to: '/datasets', icon: Database },
     ],
   },
@@ -88,6 +89,7 @@ export function AppShell() {
   const [searchText, setSearchText] = useState(params.get('q') ?? '')
   const [openGroups, setOpenGroups] = useState(() => activeGroupsFor(location.pathname))
   const { data: health, error: healthError } = useApi<{status:string;mode:'live'|'replay'|'snapshot'}>('/api/system/health')
+  const { currentRunId, currentRun, runs, setCurrentRunId, runScopedPath } = useAnalysis()
 
   useEffect(() => {
     const activeGroups = activeGroupsFor(location.pathname)
@@ -111,7 +113,7 @@ export function AppShell() {
     event.preventDefault()
     const query = searchText.trim()
     if (!query) return
-    navigate(`/search?q=${encodeURIComponent(query)}`)
+    navigate(runScopedPath('/search', { q: query }))
   }
 
   return <div className="app-shell">
@@ -122,7 +124,7 @@ export function AppShell() {
         {navigation.map(section => {
           if (!isGroup(section)) {
             const Icon = section.icon
-            return <NavLink key={section.to} className="nav-root" to={section.to} end={section.end} onClick={() => setOpen(false)}><Icon size={17} /><span>{section.label}</span></NavLink>
+            return <NavLink key={section.to} className="nav-root" to={runScopedPath(section.to)} end={section.end} onClick={() => setOpen(false)}><Icon size={17} /><span>{section.label}</span></NavLink>
           }
 
           const Icon = section.icon
@@ -137,7 +139,7 @@ export function AppShell() {
             <div className="nav-group-children">
               {section.children.map(item => {
                 const ChildIcon = item.icon
-                return <NavLink key={item.to} className="nav-child" to={item.to} onClick={() => setOpen(false)}><ChildIcon size={15} /><span>{item.label}</span></NavLink>
+                return <NavLink key={item.to} className="nav-child" to={runScopedPath(item.to)} onClick={() => setOpen(false)}><ChildIcon size={15} /><span>{item.label}</span></NavLink>
               })}
             </div>
           </div>
@@ -147,7 +149,7 @@ export function AppShell() {
     </aside>
     {open && <button className="scrim" aria-label="关闭导航" onClick={() => setOpen(false)} />}
     <main>
-      <header className="topbar"><div className="case-context"><Activity size={16} /><span>运行模式</span><strong>{healthError ? '离线' : health?.mode === 'live' ? '实时' : health?.mode === 'snapshot' ? '快照' : '回放'}</strong><span className="divider" />{healthError ? '无法读取分析窗口' : '当前窗口 · 全部已接入数据'}</div><form className="search-button global-search" onSubmit={submitSearch}><Search size={16} /><input value={searchText} onChange={event=>setSearchText(event.target.value)} placeholder="搜索事件、实体、证据或攻击链" aria-label="全局搜索" /><kbd>Enter</kbd></form></header>
+      <header className="topbar"><div className="case-context"><Activity size={16} /><span>运行模式</span><strong>{healthError ? '离线' : health?.mode === 'live' ? '实时' : health?.mode === 'snapshot' ? '快照' : '回放'}</strong><span className="divider" /><label className="run-picker"><span>当前分析任务：</span><select value={currentRunId ?? ''} onChange={event=>setCurrentRunId(event.target.value || null)}><option value="">全部数据</option>{runs.map(run=><option key={run.task_id} value={run.task_id}>{run.upload?.filename ?? run.task_id}</option>)}</select></label>{currentRun&&<code>{currentRun.task_id}</code>}</div><form className="search-button global-search" onSubmit={submitSearch}><Search size={16} /><input value={searchText} onChange={event=>setSearchText(event.target.value)} placeholder="搜索事件、实体、证据或攻击链" aria-label="全局搜索" /><kbd>Enter</kbd></form></header>
       <div className="content"><Outlet /></div>
     </main>
   </div>

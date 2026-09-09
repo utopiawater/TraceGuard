@@ -7,7 +7,7 @@ from app.core.ids import stable_id
 from app.core.time import parse_timestamp
 
 from .base import AdapterError
-from .helpers import domain_ref, file_ref, host_ref, ip_ref, provenance
+from .helpers import asset_aliases, default_timezone, domain_ref, file_ref, host_ref, ip_ref, provenance
 
 
 class ZeekAdapter:
@@ -24,7 +24,7 @@ class ZeekAdapter:
         dataset = raw.source.dataset or "zeek.conn"
         if dataset not in {"zeek.conn", "zeek.dns", "zeek.http", "zeek.files", "zeek.weird", "zeek.notice", "zeek.icmp"}:
             return []
-        ts = parse_timestamp(row.get("ts") or raw.event_time_raw or raw.observed_time.isoformat())
+        ts = parse_timestamp(row.get("ts") or raw.event_time_raw or raw.observed_time.isoformat(), default_timezone(raw))
         uid = row.get("uid")
         tx_hosts = row.get("tx_hosts") or []
         rx_hosts = row.get("rx_hosts") or []
@@ -36,7 +36,7 @@ class ZeekAdapter:
         app = row.get("service") or dataset.split(".")[-1]
         if app not in {"dns", "http", "https", "ssh", "smb", "rdp", "smtp"}:
             app = "other"
-        host = host_ref(raw.source.host_hint or src_ip, raw.source.sensor_id)
+        host = host_ref(raw.source.host_hint or src_ip, raw.source.sensor_id, asset_aliases(raw))
         session_id = stable_id("session", raw.source.sensor_id, uid) if uid else stable_id("session", raw.source.sensor_id, src_ip, row.get("id.orig_p"), dst_ip, row.get("id.resp_p"), int(ts.timestamp()))
         transport = (row.get("proto") or ("icmp" if dataset == "zeek.icmp" else "other")).lower()
         if transport not in {"tcp", "udp", "icmp", "other"}: transport = "other"

@@ -73,10 +73,41 @@ class SQLiteRepository:
         with self.connect() as connection:
             return connection.execute("SELECT 1 FROM raw_events WHERE raw_id = ?", (raw_id,)).fetchone() is not None
 
-    def counts(self) -> dict:
+    def counts(self, run_id: Optional[str] = None) -> dict:
         tables = ("raw_events", "normalized_events", "sessions", "evidence", "detections", "attack_chains", "agent_tasks", "reports", "dead_letters")
         with self.connect() as connection:
-            return {table: connection.execute("SELECT COUNT(*) FROM %s" % table).fetchone()[0] for table in tables}
+            if not run_id:
+                return {table: connection.execute("SELECT COUNT(*) FROM %s" % table).fetchone()[0] for table in tables}
+            counts = {table: 0 for table in tables}
+            manifest_row = connection.execute("SELECT input_manifest_json FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+            if manifest_row:
+                try:
+                    manifest = json.loads(manifest_row[0])
+                    counts["raw_events"] = len(manifest.get("raw_ids", []))
+                except (TypeError, json.JSONDecodeError):
+                    counts["raw_events"] = 0
+            for table in ("normalized_events", "sessions", "evidence", "detections", "attack_chains", "reports"):
+                counts[table] = connection.execute("SELECT COUNT(*) FROM %s WHERE run_id = ?" % table, (run_id,)).fetchone()[0]
+            return counts
+
+    def dashboard_aggregates(self, run_id: Optional[str] = None) -> dict:
+        where = " WHERE run_id = ?" if run_id else ""
+        params: tuple[Any, ...] = (run_id,) if run_id else ()
+        with self.connect() as connection:
+            sources = [
+                {"source": row["source_kind"], "event_count": row["event_count"], "last_event_time": row["last_event_time"], "status": "ingested"}
+                for row in connection.execute(
+                    "SELECT source_kind, COUNT(*) AS event_count, MAX(event_time) AS last_event_time FROM normalized_events%s GROUP BY source_kind ORDER BY source_kind" % where,
+                    params,
+                ).fetchall()
+            ]
+            rows = connection.execute("SELECT event_json FROM normalized_events%s" % where, params).fetchall()
+        time_quality = {"synced": 0, "other": 0}
+        for row in rows:
+            event = UnifiedSecurityEvent.model_validate_json(row[0])
+            key = "synced" if event.time.quality == "synced" else "other"
+            time_quality[key] += 1
+        return {"sources": sources, "time_quality": time_quality}
 
     def list_runs(self, limit: int = 100) -> List[dict]:
         with self.connect() as connection:
@@ -340,9 +371,12 @@ class SQLiteRepository:
                 (report_id, case_id, run_id, report_format, version, artifact_ref, json.dumps(evidence_ids), created_at),
             )
 
-    def list_reports(self, limit: int = 100) -> List[dict]:
+    def list_reports(self, limit: int = 100, run_id: Optional[str] = None) -> List[dict]:
         with self.connect() as connection:
-            rows = connection.execute("SELECT * FROM reports ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+            if run_id:
+                rows = connection.execute("SELECT * FROM reports WHERE run_id = ? ORDER BY created_at DESC LIMIT ?", (run_id, limit)).fetchall()
+            else:
+                rows = connection.execute("SELECT * FROM reports ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
         return [{**dict(row), "evidence_ids": json.loads(row["evidence_ids_json"])} for row in rows]
 
     def get_report(self, report_id: str) -> Optional[dict]:

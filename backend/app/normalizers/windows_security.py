@@ -7,7 +7,7 @@ from app.core.ids import stable_id
 from app.core.time import parse_timestamp
 
 from .base import AdapterError
-from .helpers import file_ref, host_ref, process_ref, provenance, user_ref
+from .helpers import asset_aliases, file_ref, host_ref, process_ref, provenance, user_ref
 from .windows_xml import parse_windows_event
 
 
@@ -23,7 +23,7 @@ class WindowsSecurityAdapter:
             raise AdapterError("Windows Security adapter expects exported Event XML")
         parsed = parse_windows_event(raw.payload)
         event_number, data = parsed["event_id"], parsed["data"]
-        mapping = {4624: ("auth.logon", "success"), 4625: ("auth.logon", "failure"), 4634: ("auth.logoff", "success"), 4647: ("auth.logoff", "success"), 4672: ("auth.privilege_assigned", "success"), 4663: ("file.access", "success")}
+        mapping = {4624: ("auth.logon", "success"), 4625: ("auth.logon", "failure"), 4634: ("auth.logoff", "success"), 4647: ("auth.logoff", "success"), 4672: ("auth.privilege_context", "success"), 4663: ("file.access", "success")}
         if event_number not in mapping:
             return []
         action, outcome = mapping[event_number]
@@ -31,7 +31,7 @@ class WindowsSecurityAdapter:
         computer = parsed["computer"]
         if isinstance(computer, str) and computer.lower() in {"localhost", "."}:
             computer = raw.source.host_hint or computer
-        host = host_ref(computer or raw.source.host_hint, raw.source.sensor_id)
+        host = host_ref(computer or raw.source.host_hint, raw.source.sensor_id, asset_aliases(raw))
         user = user_ref(data.get("TargetUserName"), host.entity_id, data.get("TargetUserSid"))
         session_id = stable_id("session", host.entity_id, data.get("TargetLogonId", "unknown"))
         session_ref = EntityRef(entity_type="session", entity_id=session_id, source_ids=[data.get("TargetLogonId", "")], display_name=data.get("TargetLogonId"), attributes={"logon_type": data.get("LogonType"), "ip_address": data.get("IpAddress")}, identity_quality="exact")

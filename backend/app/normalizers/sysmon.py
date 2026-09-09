@@ -7,7 +7,7 @@ from app.core.ids import stable_id
 from app.core.time import parse_timestamp
 
 from .base import AdapterError
-from .helpers import domain_ref, file_ref, host_ref, ip_ref, process_ref, provenance, registry_ref, user_ref
+from .helpers import asset_aliases, default_timezone, domain_ref, file_ref, host_ref, ip_ref, process_ref, provenance, registry_ref, user_ref
 from .windows_xml import parse_windows_event
 
 
@@ -24,8 +24,8 @@ class SysmonAdapter:
         parsed = parse_windows_event(raw.payload)
         data = parsed["data"]
         event_number = parsed["event_id"]
-        event_time = parse_timestamp(data.get("UtcTime") or parsed["time_created"] or raw.observed_time.isoformat())
-        host = host_ref(parsed["computer"] or raw.source.host_hint, raw.source.sensor_id)
+        event_time = parse_timestamp(data.get("UtcTime") or parsed["time_created"] or raw.observed_time.isoformat(), default_timezone(raw))
+        host = host_ref(parsed["computer"] or raw.source.host_hint, raw.source.sensor_id, asset_aliases(raw))
         process = process_ref(host.entity_id, data.get("ProcessGuid") or data.get("SourceProcessGuid"), data.get("ProcessId") or data.get("SourceProcessId"), data.get("Image") or data.get("SourceImage"), event_time.isoformat())
         user = user_ref(data.get("User"), host.entity_id)
         parent = process_ref(host.entity_id, data.get("ParentProcessGuid"), data.get("ParentProcessId"), data.get("ParentImage"), event_time.isoformat())

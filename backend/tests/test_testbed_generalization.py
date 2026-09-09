@@ -1,4 +1,5 @@
 import json
+import struct
 import subprocess
 import zipfile
 from datetime import timezone
@@ -12,10 +13,10 @@ from app.collectors.envelope import envelope_from_payload
 from app.contracts import Evidence, RawEventEnvelope, SourceDescriptor
 from app.core.settings import Settings
 from app.core.time import parse_timestamp, utc_now
-from app.detection.rules import FlowNetworkServiceScanningRule, SensitiveFileCollectionRule, ServiceProcessExternalConnectionRule
+from app.detection.rules import FlowNetworkServiceScanningRule, HttpC2CandidateRule, PrivilegeEscalationRule, SensitiveFileCollectionRule, ServiceProcessExternalConnectionRule
 from app.graph import InMemoryGraphProjector
 from app.main import create_app
-from app.normalizers import AuditdAdapter, NormalizerRegistry, ZeekAdapter
+from app.normalizers import ApplicationWebAdapter, AuditdAdapter, NormalizerRegistry, WindowsSecurityAdapter, ZeekAdapter
 from app.repositories import SQLiteRepository
 
 
@@ -97,6 +98,31 @@ def test_analysis_upload_pcap_tshark_fallback_produces_zeek_events(tmp_path, mon
     assert started.json()["data"]["result"]["network_events"] == 1
 
 
+def test_analysis_python_pcap_fallback_produces_network_flow(tmp_path, monkeypatch):
+    monkeypatch.setattr("app.analysis.service.shutil.which", lambda _: None)
+    pcap = tmp_path / "flow.pcap"
+    packet = _ethernet_ipv4_tcp_packet("10.0.1.50", "10.0.2.10", 40000, 80)
+    pcap.write_bytes(b"\xd4\xc3\xb2\xa1" + struct.pack("<HHIIII", 2, 4, 0, 0, 65535, 1) + struct.pack("<IIII", 1788939734, 100000, len(packet), len(packet)) + packet)
+    service = AnalysisTaskService(Settings(data_dir=tmp_path, database_path=tmp_path / "db.sqlite", raw_archive_dir=tmp_path / "raw", neo4j_enabled=False), SQLiteRepository(tmp_path / "db.sqlite"), InMemoryGraphProjector())
+    rows = list(service._pcap_payloads(pcap))
+    assert rows[0]["_dataset"] == "zeek.conn"
+    assert rows[0]["id.orig_h"] == "10.0.1.50"
+    event = ZeekAdapter().normalize(_raw("zeek", "zeek.conn", rows[0], rows[0]["ts"]))[0]
+    assert event.action == "network.flow"
+
+
+def test_windows_4672_is_privileged_context_not_privilege_escalation():
+    xml = "<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Security-Auditing'/><EventID>4672</EventID><TimeCreated SystemTime='2026-09-09T08:00:00Z'/><EventRecordID>1</EventRecordID><Channel>Security</Channel><Computer>N7-Office</Computer></System><EventData><Data Name='TargetUserName'>alice</Data><Data Name='TargetLogonId'>0x1</Data><Data Name='PrivilegeList'>SeDebugPrivilege</Data></EventData></Event>"
+    event = WindowsSecurityAdapter().normalize(_raw("windows_security", "windows.security.xml", xml, "2026-09-09T08:00:00Z"))[0]
+    assert event.action == "auth.privilege_context"
+    assert PrivilegeEscalationRule().evaluate("run", [event], [], _evidence([event])) == []
+
+
+def test_c2_candidate_requires_request_semantics_not_dataset_name():
+    event = ApplicationWebAdapter().normalize(_raw("application", "c2.http", {"timestamp": "2026-09-09T08:00:00Z", "src_ip": "10.0.1.50", "dst_ip": "10.0.2.10", "uri": "/index.html", "method": "GET"}, "2026-09-09T08:00:00Z"))[0]
+    assert HttpC2CandidateRule().evaluate("run", [event], [], _evidence([event])) == []
+
+
 def test_analysis_upload_evtx_uses_wevtutil_xml(tmp_path, monkeypatch):
     monkeypatch.setattr("app.analysis.service.shutil.which", lambda name: "wevtutil" if name == "wevtutil" else None)
     xml = "<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Security-Auditing'/><EventID>4624</EventID><TimeCreated SystemTime='2026-09-09T08:00:00Z'/><EventRecordID>1</EventRecordID><Channel>Security</Channel><Computer>N7-Office</Computer></System><EventData><Data Name='TargetUserName'>alice</Data><Data Name='TargetLogonId'>0x1</Data><Data Name='LogonType'>10</Data><Data Name='IpAddress'>10.0.1.170</Data></EventData></Event>"
@@ -118,6 +144,16 @@ def test_attack_mapping_conservative_for_privileged_logon_and_memory_protect(tmp
     provider = pipeline.detection.mappings.provider
     assert provider.mappings()["det.auth.remote_interactive_logon"] == []
     assert provider.mappings()["det.host.privilege_escalation"] == []
+
+
+def _ethernet_ipv4_tcp_packet(src_ip: str, dst_ip: str, src_port: int, dst_port: int) -> bytes:
+    eth = b"\x00\x11\x22\x33\x44\x55\x66\x77\x88\x99\xaa\xbb\x08\x00"
+    src = bytes(map(int, src_ip.split(".")))
+    dst = bytes(map(int, dst_ip.split(".")))
+    tcp = struct.pack("!HHIIHHHH", src_port, dst_port, 0, 0, 0x5000, 1024, 0, 0)
+    total_len = 20 + len(tcp)
+    ip = struct.pack("!BBHHHBBH4s4s", 0x45, 0, total_len, 1, 0, 64, 6, 0, src, dst)
+    return eth + ip + tcp
 
 
 def test_archive_zip_slip_is_rejected(tmp_path):

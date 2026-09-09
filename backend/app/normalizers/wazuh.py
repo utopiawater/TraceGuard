@@ -8,7 +8,7 @@ from app.core.time import parse_timestamp
 
 from .auditd import AuditdAdapter
 from .base import AdapterError
-from .helpers import file_ref, host_ref, process_ref, provenance, registry_ref, user_ref
+from .helpers import asset_aliases, default_timezone, file_ref, host_ref, process_ref, provenance, registry_ref, user_ref
 
 
 class WazuhAdapter:
@@ -40,13 +40,13 @@ class WazuhAdapter:
             10: ("memory.process_access", "memory"), 11: ("file.create", "file"), 12: ("registry.create", "registry"),
             13: ("registry.modify", "registry"), 14: ("registry.rename", "registry"), 23: ("file.delete", "file"),
             25: ("memory.process_tamper", "memory"), 4624: ("auth.logon", "user"), 4625: ("auth.logon", "user"),
-            4672: ("auth.privilege_assigned", "user"),
+            4672: ("auth.privilege_context", "user"),
         }
         action, object_type = mapping.get(event_number, ("security.alert", "other"))
         timestamp = payload.get("timestamp") or system.get("systemTime") or raw.event_time_raw or raw.observed_time.isoformat()
-        event_time = parse_timestamp(timestamp)
+        event_time = parse_timestamp(timestamp, default_timezone(raw))
         hostname = ((payload.get("agent") or {}).get("name") or system.get("computer") or raw.source.host_hint)
-        host = host_ref(hostname, raw.source.sensor_id)
+        host = host_ref(hostname, raw.source.sensor_id, asset_aliases(raw))
         process = process_ref(host.entity_id, eventdata.get("processGuid") or eventdata.get("sourceProcessGuid"), eventdata.get("processId") or eventdata.get("sourceProcessId"), eventdata.get("image") or eventdata.get("sourceImage"), event_time.isoformat())
         user = user_ref(eventdata.get("user") or eventdata.get("targetUserName"), host.entity_id, eventdata.get("targetUserSid"))
         object_ref = process

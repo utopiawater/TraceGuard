@@ -1,10 +1,14 @@
 import csv
 import gzip
 import json
+import os
 import shutil
+import socket
+import struct
 import subprocess
 import tarfile
 import zipfile
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
@@ -95,6 +99,7 @@ class AnalysisTaskService:
         }
         self._write_task(task)
         self._expand_input(target, extract_dir, task)
+        task["policy"] = self._load_manifest_policy(task_dir)
         found = self.identify(task_id)
         task["identification"] = found
         task["ground_truth"]["files"] = [item["path"] for item in found["found"] if item.get("evaluation_only")]
@@ -128,15 +133,19 @@ class AnalysisTaskService:
         ]
         unsupported = [{"path": str(path.relative_to(task_dir)), "reason": "unsupported or unrecognized content"} for path in files if all(item.path != path for item in recognized if item.source_kind or item.evaluation_only or item.parser_status != "ready")]
         warnings = []
-        if any(item.kind == "PCAP" and item.parser_status == "missing_parser" for item in recognized):
-            warnings.append("PCAP 已接收，但当前环境未配置 PCAP 解析器。")
+        if any(item.kind == "PCAP" and item.parser_status == "python_fallback" for item in recognized):
+            warnings.append("PCAP 未发现 Zeek/tshark，将使用 Python 内置 flow 聚合 fallback。")
         return {"found": found, "unsupported": unsupported, "warnings": warnings}
 
     def start(self, task_id: str) -> dict:
         task = self.get(task_id)
         if task["status"] not in {"identified", "failed"}:
+            if task.get("status") == "completed" and task.pop("error", None) is not None:
+                task["updated_at"] = utc_now().isoformat()
+                self._write_task(task)
             return task
         task["status"] = "running"
+        task.pop("error", None)
         task["current_stage"] = "parsed"
         task["stages"] = self._stage_views("parsed")
         task["updated_at"] = utc_now().isoformat()
@@ -148,11 +157,13 @@ class AnalysisTaskService:
             task["updated_at"] = utc_now().isoformat()
             self._write_task(task)
             pipeline = build_pipeline(self.settings, self.repository, self.graph)
-            result = pipeline.run(task_id, raws, mode="replay")
+            with self._task_policy_environment(task.get("policy") or {}):
+                result = pipeline.run(task_id, raws, mode="replay")
             task["status"] = "completed"
             task["current_stage"] = "completed"
             task["stages"] = self._stage_views("completed")
             task["result"] = self._result_summary(task_id, result)
+            task.pop("error", None)
             task["updated_at"] = utc_now().isoformat()
             self._write_task(task)
         except Exception as exc:
@@ -244,7 +255,7 @@ class AnalysisTaskService:
             return RecognizedFile(path, "Ground Truth", None, None, "json" if lowered.endswith(".json") else "text", reason="evaluation-only file", evaluation_only=True)
         if lowered.endswith(".pcap"):
             parser = shutil.which("zeek") or shutil.which("tshark")
-            return RecognizedFile(path, "PCAP", SourceKind.zeek if parser else None, "pcap", "pcap_ref", 1, "pcap capture", parser_status="ready" if parser else "missing_parser")
+            return RecognizedFile(path, "PCAP", SourceKind.zeek, "pcap", "pcap_ref", 1, "pcap capture", parser_status="ready" if parser else "python_fallback")
         if lowered.endswith(".evtx"):
             parser = shutil.which("wevtutil")
             return RecognizedFile(path, "Windows EVTX", SourceKind.windows_security if parser else None, "windows.evtx", "evtx", 1, "Windows EVTX event log", parser_status="ready" if parser else "missing_parser")
@@ -267,7 +278,7 @@ class AnalysisTaskService:
             if dataset:
                 return dataset
         if lowered.endswith(".csv") or self._looks_like_web_log(sample):
-            dataset = "c2.http" if "c2" in lowered else "web.nginx" if self._looks_like_web_log(sample) else "generic.csv"
+            dataset = "web.nginx" if self._looks_like_web_log(sample) else "generic.csv"
             return RecognizedFile(path, "Nginx/Web日志", SourceKind.application, dataset, "csv" if lowered.endswith(".csv") else "text", self._count_records(path), "web access log")
         return RecognizedFile(path, "Unknown", None, None, "text", 0, "unrecognized")
 
@@ -285,14 +296,16 @@ class AnalysisTaskService:
                 record_dataset = payload.pop("_dataset", dataset) if isinstance(payload, dict) else dataset
                 record_kind = self._windows_kind_from_xml(payload, kind)
                 event_time_raw = self._event_time(payload)
-                observed = parse_timestamp(event_time_raw) if event_time_raw is not None else utc_now()
+                default_tz = (task.get("policy") or {}).get("default_timezone")
+                observed = parse_timestamp(event_time_raw, default_tz) if event_time_raw is not None else utc_now()
                 record_id = "%s:%s:%d" % (task["task_id"], path.name, index)
                 host_hint = self._host_hint(payload)
                 if host_hint and host_hint.lower() in {"localhost", "."}:
                     host_hint = self._host_hint_from_path(path) or host_hint
                 source = SourceDescriptor(kind=record_kind, product=self._product(record_kind, record_dataset), dataset=record_dataset, sensor_id=self._sensor_id(path, payload, record_kind), host_hint=host_hint or self._host_hint_from_path(path), source_record_id=record_id)
                 payload_format = "json" if item["payload_format"] == "pcap_ref" else "xml" if item["payload_format"] == "evtx" else item["payload_format"]
-                raws.append(envelope_from_payload(source, payload, payload_format, event_time_raw, "analysis://%s/%s#%d" % (task["task_id"], item["path"], index), observed, {"analysis_task_id": task["task_id"], "uploaded_file": task["upload"]["filename"]}))
+                labels = {"analysis_task_id": task["task_id"], "uploaded_file": task["upload"]["filename"], **(task.get("policy") or {})}
+                raws.append(envelope_from_payload(source, payload, payload_format, event_time_raw, "analysis://%s/%s#%d" % (task["task_id"], item["path"], index), observed, labels))
         return raws
 
     def _payloads(self, path: Path, payload_format: str, dataset: Optional[str]) -> Iterable[Any]:
@@ -358,7 +371,8 @@ class AnalysisTaskService:
             return
         tshark = shutil.which("tshark")
         if not tshark:
-            raise ValueError("PCAP parser prerequisite missing: install Zeek or tshark")
+            yield from self._python_pcap_payloads(path)
+            return
         fields = ["frame.time_epoch", "ip.src", "ip.dst", "tcp.srcport", "udp.srcport", "tcp.dstport", "udp.dstport", "_ws.col.Protocol", "frame.len"]
         command = [tshark, "-r", str(path), "-T", "fields", "-E", "separator=\t"]
         for field in fields:
@@ -374,6 +388,95 @@ class AnalysisTaskService:
             dst_port = parts[5] or parts[6] or None
             proto = "udp" if parts[4] or parts[6] else "tcp" if parts[3] or parts[5] else "icmp" if "ICMP" in parts[7].upper() else "other"
             yield {"_dataset": "zeek.conn", "ts": float(parts[0]), "uid": stable_id("pcap", path.name, index), "id.orig_h": parts[1], "id.resp_h": parts[2], "id.orig_p": int(src_port) if src_port else None, "id.resp_p": int(dst_port) if dst_port else None, "proto": proto, "orig_bytes": int(parts[8] or 0), "resp_bytes": 0}
+
+    def _python_pcap_payloads(self, path: Path) -> Iterable[dict]:
+        data = path.read_bytes()
+        if len(data) < 24:
+            return
+        magic = data[:4]
+        endian = "<" if magic in {b"\xd4\xc3\xb2\xa1", b"\x4d\x3c\xb2\xa1"} else ">" if magic in {b"\xa1\xb2\xc3\xd4", b"\xa1\xb2\x3c\x4d"} else ""
+        if not endian:
+            return
+        nano = magic in {b"\x4d\x3c\xb2\xa1", b"\xa1\xb2\x3c\x4d"}
+        offset = 24
+        flows: Dict[tuple, dict] = {}
+        index = 0
+        while offset + 16 <= len(data):
+            sec, frac, incl_len, _orig_len = struct.unpack(endian + "IIII", data[offset:offset + 16])
+            offset += 16
+            packet = data[offset:offset + incl_len]
+            offset += incl_len
+            parsed = self._parse_ipv4_packet(packet)
+            if not parsed:
+                continue
+            src, dst, proto, src_port, dst_port, length = parsed
+            key = (src, dst, proto, src_port, dst_port)
+            ts = sec + frac / (1_000_000_000 if nano else 1_000_000)
+            flow = flows.setdefault(key, {"_dataset": "zeek.conn", "ts": ts, "uid": stable_id("pcap", path.name, index), "id.orig_h": src, "id.resp_h": dst, "id.orig_p": src_port, "id.resp_p": dst_port, "proto": proto, "orig_bytes": 0, "resp_bytes": 0, "orig_pkts": 0, "resp_pkts": 0, "duration": 0.0})
+            flow["orig_bytes"] += length
+            flow["orig_pkts"] += 1
+            flow["duration"] = max(float(flow["duration"]), ts - float(flow["ts"]))
+            index += 1
+        yield from flows.values()
+
+    @staticmethod
+    def _parse_ipv4_packet(packet: bytes) -> Optional[tuple]:
+        if len(packet) < 34:
+            return None
+        eth_type = struct.unpack("!H", packet[12:14])[0]
+        if eth_type != 0x0800:
+            return None
+        ip_start = 14
+        version_ihl = packet[ip_start]
+        if version_ihl >> 4 != 4:
+            return None
+        ihl = (version_ihl & 0x0F) * 4
+        proto_no = packet[ip_start + 9]
+        total_len = struct.unpack("!H", packet[ip_start + 2:ip_start + 4])[0]
+        src = socket.inet_ntoa(packet[ip_start + 12:ip_start + 16])
+        dst = socket.inet_ntoa(packet[ip_start + 16:ip_start + 20])
+        l4 = ip_start + ihl
+        proto = "tcp" if proto_no == 6 else "udp" if proto_no == 17 else "icmp" if proto_no == 1 else "other"
+        src_port = dst_port = None
+        if proto in {"tcp", "udp"} and len(packet) >= l4 + 4:
+            src_port, dst_port = struct.unpack("!HH", packet[l4:l4 + 4])
+        return src, dst, proto, src_port, dst_port, total_len
+
+    def _load_manifest_policy(self, task_dir: Path) -> dict:
+        policy: dict = {}
+        for name in ("traceguard_manifest.json", "manifest.json"):
+            for root in (task_dir / "extracted", task_dir / "upload"):
+                path = root / name
+                if not path.is_file():
+                    continue
+                try:
+                    manifest = json.loads(path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    continue
+                for key in ("default_timezone", "asset_aliases", "sensitive_path_patterns"):
+                    if key in manifest:
+                        policy[key] = manifest[key]
+        return policy
+
+    @contextmanager
+    def _task_policy_environment(self, policy: dict):
+        updates = {}
+        if policy.get("default_timezone"):
+            updates["TRACEGUARD_DEFAULT_TIMEZONE"] = str(policy["default_timezone"])
+        if policy.get("asset_aliases"):
+            updates["TRACEGUARD_ASSET_ALIASES"] = json.dumps(policy["asset_aliases"], ensure_ascii=False)
+        if policy.get("sensitive_path_patterns"):
+            updates["TRACEGUARD_SENSITIVE_PATHS"] = ";".join(str(item) for item in policy["sensitive_path_patterns"])
+        previous = {key: os.environ.get(key) for key in updates}
+        try:
+            os.environ.update(updates)
+            yield
+        finally:
+            for key, value in previous.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
 
     def _evtx_payloads(self, path: Path) -> Iterable[str]:
         parser = shutil.which("wevtutil")
@@ -505,8 +608,6 @@ class AnalysisTaskService:
             return "n8-core"
         if name.startswith("n4_"):
             return "n4-web"
-        if "c2" in name:
-            return "c2"
         return None
 
     @staticmethod

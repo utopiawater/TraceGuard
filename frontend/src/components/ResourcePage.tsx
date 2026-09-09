@@ -1,13 +1,12 @@
 import { EmptyState } from './EmptyState'
 import { PageHeader } from './PageHeader'
+import { useAnalysis } from '../context/AnalysisContext'
 import { useApi } from '../hooks/useApi'
-import { useSearchParams } from 'react-router-dom'
 
 type Row = Record<string, unknown>
 
 export function ResourcePage({ title, description, endpoint, columns }: { title: string; description: string; endpoint: string; columns: [string,string][] }) {
-  const [params] = useSearchParams()
-  const runId = params.get('run_id')
+  const { currentRunId: runId } = useAnalysis()
   const scopedEndpoint = runId ? `${endpoint}${endpoint.includes('?') ? '&' : '?'}run_id=${encodeURIComponent(runId)}` : endpoint
   const { data, meta, loading, error } = useApi<Row[]>(scopedEndpoint)
   return <><PageHeader title={title} description={description} aside={runId ? <span className="freshness">任务 {runId}</span> : undefined} />

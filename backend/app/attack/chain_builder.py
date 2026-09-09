@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import List
 
 from app.contracts import AttackChain, ChainStep, DetectionResult
 from app.contracts.analytics import ChainStepRef, StepPredecessor
@@ -19,20 +19,27 @@ class DeterministicChainBuilder:
 
     def build(self, run_id: str, detections: List[DetectionResult]) -> List[AttackChain]:
         groups = self.correlation.groups(detections)
-        return [self._build_group(run_id, group) for group in groups if any(TACTIC_STAGE.get(item.attack_mappings[0].tactic_ids[0]) in MAINLINE for item in group)]
+        return [self._build_group(run_id, group) for group in groups if any(item.attack_mappings and TACTIC_STAGE.get(item.attack_mappings[0].tactic_ids[0]) in MAINLINE for item in group)]
 
     def _build_group(self, run_id: str, eligible: List[DetectionResult]) -> AttackChain:
         eligible.sort(key=lambda item: (item.created_at, SEVERITY_ORDER[item.severity], item.detection_id))
-        selected_by_stage: Dict[str, DetectionResult] = {}
+        selected: List[DetectionResult] = []
+        seen = set()
         for detection in eligible:
+            if not detection.attack_mappings:
+                continue
             tactic = detection.attack_mappings[0].tactic_ids[0]
             stage = TACTIC_STAGE.get(tactic, "execution")
             if stage not in MAINLINE:
                 continue
-            current = selected_by_stage.get(stage)
-            if current is None or self._stage_representative_key(detection) > self._stage_representative_key(current):
-                selected_by_stage[stage] = detection
-        eligible = sorted(selected_by_stage.values(), key=lambda item: (item.created_at, SEVERITY_ORDER[item.severity], item.detection_id))
+            technique_id = detection.attack_mappings[0].subtechnique_id or detection.attack_mappings[0].technique_id
+            evidence_key = tuple(sorted(detection.evidence_ids))
+            key = (stage, technique_id, evidence_key)
+            if key in seen:
+                continue
+            seen.add(key)
+            selected.append(detection)
+        eligible = sorted(selected, key=lambda item: (item.created_at, SEVERITY_ORDER[item.severity], item.detection_id))
         steps: List[ChainStep] = []
         for index, detection in enumerate(eligible):
             mapping = detection.attack_mappings[0]

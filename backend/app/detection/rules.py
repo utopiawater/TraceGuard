@@ -1,7 +1,9 @@
 import ipaddress
+import json
 import ntpath
 import os
 import posixpath
+from pathlib import Path
 from collections import defaultdict
 from fnmatch import fnmatch
 from typing import Dict, List
@@ -150,10 +152,6 @@ class PrivilegeEscalationRule:
 class SensitiveFileCollectionRule:
     rule_id = "det.host.sensitive_file_collection"
     version = "1.0.0"
-    default_patterns = (
-        "/etc/shadow", "/etc/passwd", "/root/.ssh/**", "/home/*/.ssh/**",
-        "/data/secret/**", "/srv/confidential/**", "*\\sam", "*\\documents\\*", "*credentials*",
-    )
 
     def evaluate(self, run_id, events, sessions, evidence):
         results = []
@@ -170,7 +168,15 @@ class SensitiveFileCollectionRule:
     def _patterns(cls) -> List[str]:
         configured = os.getenv("TRACEGUARD_SENSITIVE_PATHS", "")
         values = [item.strip().lower() for item in configured.split(";") if item.strip()]
-        return values or [item.lower() for item in cls.default_patterns]
+        if values:
+            return values
+        policy_path = Path(os.getenv("TRACEGUARD_SENSITIVE_PATH_POLICY", Path(__file__).parents[3] / "knowledge" / "policies" / "sensitive_paths.json"))
+        try:
+            payload = json.loads(policy_path.read_text(encoding="utf-8"))
+            patterns = payload.get("patterns", []) if isinstance(payload, dict) else []
+            return [str(item).lower() for item in patterns if str(item).strip()]
+        except (OSError, json.JSONDecodeError):
+            return []
 
     @classmethod
     def _matches_sensitive_path(cls, path: str) -> bool:
@@ -498,8 +504,8 @@ class HttpC2CandidateRule:
             if event.action != "http.request" or not event.network or not event.network.http:
                 continue
             uri = str(event.network.http.get("uri") or "").lower()
-            dataset = str(event.source.dataset or "")
-            if not (dataset.startswith("c2.") or any(token in uri for token in ("beacon", "checkin", "callback"))):
+            user_agent = str(event.network.http.get("user_agent") or "").lower()
+            if not any(token in f"{uri} {user_agent}" for token in ("beacon", "checkin", "callback", "tasking")):
                 continue
             key = (event.network.src.ip, event.network.dst.ip or event.source.sensor_id)
             groups[key].append(event)
@@ -521,7 +527,7 @@ class HttpC2CandidateRule:
                 entity_ids=refs,
                 session_ids=sorted({item.network.session_id for item in items[:20] if item.network.session_id}),
                 feature_values={"peer": key, "request_count": len(items), "uris": [str(item.network.http.get("uri") or "") for item in items[:10]], "status": "suspected_c2"},
-                reason="HTTP 请求命中信标/回连语义或来自 C2 角色日志源，只能说明存在 C2 候选通信，仍需网络流量和主机证据进一步确认。",
+                reason="HTTP 请求自身命中信标、回连或任务领取语义，只能说明存在 C2 候选通信，仍需网络流量和主机证据进一步确认。",
                 attack_mappings=[],
                 evidence_ids=_evidence_for(event_ids, evidence),
                 created_at=max(item.event_time for item in items),

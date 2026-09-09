@@ -43,7 +43,7 @@ def test_online_analysis_pcap_without_parser_is_non_fatal(tmp_path, monkeypatch)
     uploaded = client.post("/api/v1/analysis/upload", files={"file": ("flow.pcap", b"\xd4\xc3\xb2\xa1", "application/octet-stream")})
     assert uploaded.status_code == 200
     payload = uploaded.json()
-    assert "PCAP 已接收" in payload["meta"]["warnings"][0]
+    assert "Python 内置 flow 聚合 fallback" in payload["meta"]["warnings"][0]
     task = payload["data"]
     started = client.post("/api/v1/analysis/tasks/%s/start" % task["task_id"])
     assert started.status_code == 200

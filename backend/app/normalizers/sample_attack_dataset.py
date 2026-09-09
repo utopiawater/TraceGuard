@@ -7,7 +7,7 @@ from app.core.ids import stable_id
 from app.core.time import parse_timestamp
 
 from .base import AdapterError
-from .helpers import host_ref, ip_ref, process_ref, provenance, user_ref
+from .helpers import asset_aliases, default_timezone, host_ref, ip_ref, process_ref, provenance, user_ref
 
 
 class SampleAttackDatasetAdapter:
@@ -21,8 +21,8 @@ class SampleAttackDatasetAdapter:
         if not isinstance(raw.payload, dict):
             raise AdapterError("sample attack dataset adapter expects JSON records")
         row: Dict[str, Any] = raw.payload
-        event_time = parse_timestamp(row.get("timestamp") or row.get("ts") or raw.event_time_raw or raw.observed_time.isoformat())
-        host = host_ref(row.get("host") or raw.source.host_hint, raw.source.sensor_id)
+        event_time = parse_timestamp(row.get("timestamp") or row.get("ts") or raw.event_time_raw or raw.observed_time.isoformat(), default_timezone(raw))
+        host = host_ref(row.get("host") or raw.source.host_hint, raw.source.sensor_id, asset_aliases(raw))
         user = user_ref(row.get("user"), host.entity_id)
         process_name = row.get("process") or row.get("image")
         command_line = row.get("command_line") or row.get("cmdline")

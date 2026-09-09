@@ -111,7 +111,7 @@
     "det.network.service_scanning": [{"technique_id":"T1046","subtechnique_id":null,"tactic_ids":["TA0007"],"mapping_rule_id":"map.network.service_scanning","attack_version":"19.2","confidence":0.82}],
     "det.network.flow_service_scanning": [{"technique_id":"T1046","subtechnique_id":null,"tactic_ids":["TA0007"],"mapping_rule_id":"map.network.flow_service_scanning","attack_version":"19.2","confidence":0.82}],
     "det.network.http_c2_candidate": [{"technique_id":"T1071","subtechnique_id":"T1071.001","tactic_ids":["TA0011"],"mapping_rule_id":"map.network.http_c2_candidate","attack_version":"19.2","confidence":0.68}],
-    "det.web.probing": [{"technique_id":"T1190","subtechnique_id":null,"tactic_ids":["TA0001"],"mapping_rule_id":"map.web.probing_candidate","attack_version":"19.2","confidence":0.55}],
+    "det.web.probing": [],
     "det.host.archive_collected_data": [{"technique_id":"T1560","subtechnique_id":"T1560.001","tactic_ids":["TA0009"],"mapping_rule_id":"map.host.archive_collected_data","attack_version":"19.2","confidence":0.74}],
     "det.host.suspicious_http_client_transfer": []
   }

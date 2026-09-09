@@ -1,5 +1,7 @@
 import ipaddress
+import json
 import ntpath
+import os
 import posixpath
 from typing import Any, Dict, Optional
 
@@ -8,9 +10,41 @@ from app.contracts.events import EventProvenance
 from app.core.ids import stable_id
 
 
-def host_ref(hostname: Optional[str], sensor_id: str) -> EntityRef:
-    name = (hostname or sensor_id).strip().lower()
-    return EntityRef(entity_type="host", entity_id=stable_id("host", name), source_ids=[sensor_id], display_name=name, attributes={"hostname": name}, identity_quality="derived")
+def default_timezone(raw: RawEventEnvelope) -> Optional[str]:
+    value = raw.labels.get("default_timezone")
+    return str(value) if value else None
+
+
+def asset_aliases(raw: Optional[RawEventEnvelope] = None) -> Dict[str, str]:
+    configured = raw.labels.get("asset_aliases") if raw else None
+    if not configured:
+        configured = os.getenv("TRACEGUARD_ASSET_ALIASES")
+    if isinstance(configured, dict):
+        pairs = configured.items()
+    elif isinstance(configured, str) and configured.strip():
+        try:
+            parsed = json.loads(configured)
+            pairs = parsed.items() if isinstance(parsed, dict) else []
+        except json.JSONDecodeError:
+            pairs = (item.split("=", 1) for item in configured.split(";") if "=" in item)
+    else:
+        pairs = []
+    return {str(alias).strip().lower(): str(canonical).strip().lower() for alias, canonical in pairs if str(alias).strip() and str(canonical).strip()}
+
+
+def canonical_asset_name(value: Optional[str], aliases: Optional[Dict[str, str]] = None) -> str:
+    name = (value or "").strip().lower()
+    if not name:
+        return ""
+    name = aliases.get(name, name) if aliases else name
+    if "." in name and not _looks_like_ip(name):
+        name = aliases.get(name.split(".", 1)[0], name) if aliases else name.split(".", 1)[0]
+    return name
+
+
+def host_ref(hostname: Optional[str], sensor_id: str, aliases: Optional[Dict[str, str]] = None) -> EntityRef:
+    name = canonical_asset_name(hostname or sensor_id, aliases)
+    return EntityRef(entity_type="host", entity_id=stable_id("host", name), source_ids=[sensor_id], display_name=name, attributes={"hostname": name, "aliases": sorted([key for key, value in (aliases or {}).items() if value == name])}, identity_quality="derived")
 
 
 def user_ref(name: Optional[str], host_id: str, sid: Optional[str] = None) -> Optional[EntityRef]:
@@ -55,3 +89,11 @@ def domain_ref(name: Optional[str]) -> Optional[EntityRef]:
 
 def provenance(raw: RawEventEnvelope, parser: str, version: str, warnings: Optional[list] = None) -> EventProvenance:
     return EventProvenance(raw_id=raw.raw_id, raw_ref=raw.raw_ref, raw_sha256=raw.raw_sha256, parser_name=parser, parser_version=version, mapping_warnings=warnings or [])
+
+
+def _looks_like_ip(value: str) -> bool:
+    try:
+        ipaddress.ip_address(value)
+        return True
+    except ValueError:
+        return False

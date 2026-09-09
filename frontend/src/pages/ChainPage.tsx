@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router-dom'
 import type { components } from '../api/generated'
 import { EmptyState } from '../components/EmptyState'
 import { PageHeader } from '../components/PageHeader'
+import { useAnalysis } from '../context/AnalysisContext'
 import { useApi } from '../hooks/useApi'
 import { chainStatusName, pct, stageName } from '../lib/display'
 
@@ -174,7 +175,7 @@ function applyNodeFocus(cy: cytoscape.Core, node: cytoscape.NodeSingular) {
 
 export function ChainPage() {
   const [params] = useSearchParams()
-  const runId = params.get('run_id')
+  const { currentRunId: runId } = useAnalysis()
   const scoped = runId ? `run_id=${encodeURIComponent(runId)}` : ''
   const { data: chains, error, loading } = useApi<Chain[]>(`/api/chains${scoped ? `?${scoped}` : ''}`)
   const { data: graph } = useApi<Graph>(`/api/graph${scoped ? `?${scoped}` : ''}`)
@@ -530,7 +531,7 @@ export function ChainPage() {
     fitElements(cy, cy.elements(), 76)
   }
 
-  return <><PageHeader title="攻击链溯源" description="逐步核对时间、实体、会话、ATT&CK 映射和原始证据。" />
+  return <><PageHeader title="攻击链溯源" description="当前 run 的攻击路径、时间线、Evidence 与多源关联关系。" aside={runId ? <span className="freshness">任务 {runId}</span> : undefined} />
     {loading && <div className="skeleton-hero"/>}{error && <EmptyState kind="error" title="攻击链读取失败" detail={error}/>} {!loading && !error && !chain && <EmptyState title="尚未形成攻击链" detail="主管道产生带证据的检测并满足关联约束后，候选链会出现在这里。"/>}
     {chain && <><section className="chain-summary"><div><span className={`badge ${chain.status==='candidate'?'candidate':'neutral'}`}>{chainStatusName[chain.status] ?? chain.status}</span><h2>{chain.title}</h2></div><dl><div><dt title="链可信评分：由步骤检测置信度和 ATT&CK 映射置信度综合得到。">链可信评分</dt><dd>{pct(chain.score)}</dd></div><div><dt title="完整度：当前链覆盖预期战术阶段的比例；不是检测准确率。">完整度</dt><dd>{pct(chain.completeness)}</dd></div><div><dt title="阶段数：系统恢复出的攻击链步骤数量。">阶段数</dt><dd>{chain.steps.length}</dd></div></dl></section>
       <ol className="stage-track">{chain.steps.map((step,i)=><li className={selected?.step_id===step.step_id?'active':''} key={step.step_id}><button onClick={()=>handleStageClick(step)}><span>{i+1}</span><small>{stageLabel(step.stage)}</small><strong>{step.technique_id}{techniqueName(step.technique_id)?` · ${techniqueName(step.technique_id)}`:''}</strong></button></li>)}</ol>

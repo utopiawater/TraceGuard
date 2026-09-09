@@ -7,7 +7,7 @@ from app.contracts.events import ObjectContext
 from app.core.ids import stable_id
 from app.core.time import parse_timestamp
 
-from .helpers import domain_ref, host_ref, ip_ref, provenance
+from .helpers import asset_aliases, default_timezone, domain_ref, host_ref, ip_ref, provenance
 
 
 NGINX_RE = re.compile(
@@ -26,11 +26,11 @@ class ApplicationWebAdapter:
         rows = self._rows(raw.payload)
         events: List[UnifiedSecurityEvent] = []
         for index, row in enumerate(rows):
-            ts = parse_timestamp(row.get("timestamp") or row.get("time") or raw.event_time_raw or raw.observed_time.isoformat())
+            ts = parse_timestamp(row.get("timestamp") or row.get("time") or raw.event_time_raw or raw.observed_time.isoformat(), default_timezone(raw))
             host_header = row.get("host") or row.get("domain") or row.get("server_name")
             src_ip = row.get("src_ip") or row.get("remote_addr") or row.get("client_ip")
             dst_ip = row.get("dst_ip") or row.get("server_ip")
-            host = host_ref(raw.source.host_hint or host_header or raw.source.sensor_id, raw.source.sensor_id)
+            host = host_ref(raw.source.host_hint or host_header or raw.source.sensor_id, raw.source.sensor_id, asset_aliases(raw))
             dst_port = self._port(row.get("dst_port") or row.get("server_port") or (443 if str(row.get("scheme")).lower() == "https" else 80))
             src_port = self._port(row.get("src_port") or row.get("client_port"))
             session_id = stable_id("session", raw.source.sensor_id, src_ip, src_port, dst_ip or host_header, dst_port, index)
