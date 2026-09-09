@@ -1,0 +1,57 @@
+[
+  {
+    "event_id": "fixture:file:execute",
+    "timestamp": "2018-04-12T18:00:27.000000000Z",
+    "timestamp_ns": 1523556027000000000,
+    "host": "fixture-cadets-host",
+    "provider": "minimal_test_fixture",
+    "event_type": "execute",
+    "original_event_type": "EVENT_EXECUTE",
+    "action": "aue_execve",
+    "process": "sh",
+    "subject_id": "fixture-subject-shell",
+    "parent_subject_id": "fixture-subject-nginx",
+    "object_id": "fixture-file-loader",
+    "object_path": "/tmp/fixture-loader",
+    "user": "www-data",
+    "attack_label": "fixture_only",
+    "selection_reason": ["minimal_fixture_field_coverage"],
+    "evidence": {
+      "type": "FILE_OBJECT",
+      "name": "/tmp/fixture-loader",
+      "properties": {
+        "cmdLine": "/tmp/fixture-loader --check",
+        "return_value": 0
+      }
+    },
+    "quality_flags": ["minimal_fixture"],
+    "raw_location": "minimal_fixture/file_events.json#fixture:file:execute"
+  },
+  {
+    "event_id": "fixture:file:read",
+    "timestamp": "2018-04-12T18:00:28.000000000Z",
+    "timestamp_ns": 1523556028000000000,
+    "host": "fixture-cadets-host",
+    "provider": "minimal_test_fixture",
+    "event_type": "read",
+    "original_event_type": "EVENT_READ",
+    "action": "aue_read",
+    "process": "sh",
+    "subject_id": "fixture-subject-shell",
+    "object_id": "fixture-file-passwd",
+    "object_path": "/etc/passwd",
+    "user": "www-data",
+    "attack_label": "fixture_only",
+    "selection_reason": ["minimal_fixture_field_coverage"],
+    "evidence": {
+      "type": "FILE_OBJECT",
+      "name": "/etc/passwd",
+      "size": 128,
+      "properties": {
+        "return_value": 128
+      }
+    },
+    "quality_flags": ["minimal_fixture"],
+    "raw_location": "minimal_fixture/file_events.json#fixture:file:read"
+  }
+]

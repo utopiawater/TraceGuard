@@ -3,12 +3,16 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.collectors import LinuxAuditCollector, ReplayCollector, WindowsEventCollector, ZeekCollector
+from app.bootstrap import build_pipeline
 from app.core.settings import Settings
+from app.graph import InMemoryGraphProjector
 from app.main import create_app
 from app.normalizers.auditd import AuditdAdapter
+from app.normalizers.sample_attack_dataset import SampleAttackDatasetAdapter
 from app.normalizers.sysmon import SysmonAdapter
 from app.normalizers.windows_security import WindowsSecurityAdapter
 from app.normalizers.zeek import ZeekAdapter
+from app.repositories import SQLiteRepository
 
 
 ROOT = Path(__file__).parents[1]
@@ -41,6 +45,27 @@ def test_collectors_feed_existing_normalizers():
     assert {event.action for event in sysmon_events} >= {"process.start", "network.connect"}
     assert {event.action for event in audit_events} >= {"process.start", "file.read", "network.connect"}
     assert {event.action for event in zeek_events} >= {"network.flow", "dns.query", "http.request"}
+
+
+def test_replay_sample_dataset_feeds_full_analysis_pipeline(tmp_path):
+    raws = ReplayCollector(PROJECT_ROOT / "datasets" / "sample_attack_dataset.json").collect()
+    adapter = SampleAttackDatasetAdapter()
+    normalized = [event for raw in raws if adapter.supports(raw) for event in adapter.normalize(raw)]
+
+    settings = Settings(data_dir=tmp_path, database_path=tmp_path / "replay.db", raw_archive_dir=tmp_path / "raw", neo4j_enabled=False)
+    repo = SQLiteRepository(settings.database_path)
+    graph = InMemoryGraphProjector()
+    result = build_pipeline(settings, repo, graph).run("run_replay_sample_dataset", raws)
+
+    assert len(raws) == 2
+    assert len(normalized) == 2
+    assert result.accepted_raw == 2
+    assert len(result.events) == 2
+    assert len(result.evidence) == 2
+    assert repo.counts()["normalized_events"] == 2
+    assert {event.action for event in result.events} == {"auth.logon", "network.connect"}
+    assert any(event.actor.user and event.actor.user.display_name == "CORP\\student" for event in result.events)
+    assert any(event.network and event.network.dst.ip == "203.0.113.77" and event.network.transport == "tcp" for event in result.events)
 
 
 def test_collectors_status_endpoint(tmp_path):

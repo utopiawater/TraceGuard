@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.agents.harness import default_agent_registry
@@ -22,7 +23,9 @@ from app.repositories import SQLiteRepository
 
 ROOT = Path(__file__).parents[2]
 DATASET = ROOT / "datasets" / "darpa_tc_e3_cadets"
+FIXTURE_DATASET = ROOT / "backend" / "fixtures" / "datasets" / "darpa_tc_e3_cadets"
 ATTACK = ROOT / "knowledge" / "attack" / "mappings.json"
+REAL_DATASET_SKIP_REASON = "DARPA TC E3 dataset is not installed locally."
 
 
 def _settings(tmp_path):
@@ -31,6 +34,16 @@ def _settings(tmp_path):
 
 def _event(raws, original_event_id):
     return next(item for item in raws if item.source_record_id == original_event_id)
+
+
+def _has_darpa_dataset(dataset_root=DATASET):
+    processed = dataset_root / "processed_dataset"
+    return all((processed / name).is_file() for name in ("process_events.json", "network_events.json", "file_events.json"))
+
+
+def _require_darpa_dataset():
+    if not _has_darpa_dataset():
+        pytest.skip(REAL_DATASET_SKIP_REASON)
 
 
 def _task(task_id="task_dataset", role="host", tools=None):
@@ -74,6 +87,7 @@ def _detection(rule_id, technique_id, confidence, created_at, tactic_id="TA0004"
 
 
 def test_darpa_dataset_actual_counts_and_field_distribution():
+    _require_darpa_dataset()
     report = inspect_dataset(DATASET)
     assert report["dataset_id"] == DATASET_ID
     assert report["dataset_name"] == DATASET_NAME
@@ -85,6 +99,7 @@ def test_darpa_dataset_actual_counts_and_field_distribution():
 
 
 def test_darpa_reader_loads_three_files_without_exposing_ground_truth_labels():
+    _require_darpa_dataset()
     raws = load_raw_envelopes(DATASET)
     assert len(raws) == 20776
     assert {item.payload["dataset_file"] for item in raws} == {"process_events.json", "network_events.json", "file_events.json"}
@@ -93,6 +108,7 @@ def test_darpa_reader_loads_three_files_without_exposing_ground_truth_labels():
 
 
 def test_darpa_normalizer_maps_process_network_and_file_samples_to_unified_schema():
+    _require_darpa_dataset()
     raws = load_raw_envelopes(DATASET)
     adapter = DarpaTcE3CadetsAdapter()
     process = adapter.normalize(_event(raws, "cadets:record:3587335"))[0]
@@ -111,6 +127,7 @@ def test_darpa_normalizer_maps_process_network_and_file_samples_to_unified_schem
 
 
 def test_unknown_darpa_action_is_preserved_with_mapping_warning():
+    _require_darpa_dataset()
     raw = load_raw_envelopes(DATASET)[0]
     modified = raw.model_copy(update={"payload": {**raw.payload, "action": "aue_not_real"}})
     event = DarpaTcE3CadetsAdapter().normalize(modified)[0]
@@ -119,6 +136,7 @@ def test_unknown_darpa_action_is_preserved_with_mapping_warning():
 
 
 def test_ground_truth_loader_is_evaluation_only_and_agent_tools_do_not_expose_it(tmp_path):
+    _require_darpa_dataset()
     truth = load_evaluation_ground_truth(DATASET)
     assert len(truth["ioc_event_ids"]) == 776
     settings = _settings(tmp_path)
@@ -137,6 +155,7 @@ def test_ground_truth_loader_is_evaluation_only_and_agent_tools_do_not_expose_it
 
 
 def test_run_scoped_queries_keep_dataset_runs_isolated(tmp_path):
+    _require_darpa_dataset()
     raws = load_raw_envelopes(DATASET)
     settings = _settings(tmp_path)
     repo = SQLiteRepository(settings.database_path)
@@ -150,6 +169,7 @@ def test_run_scoped_queries_keep_dataset_runs_isolated(tmp_path):
 
 
 def test_agent_event_search_can_find_early_dataset_event_beyond_5000_rows(tmp_path):
+    _require_darpa_dataset()
     raws = load_raw_envelopes(DATASET)[:6001]
     settings = _settings(tmp_path)
     repo = SQLiteRepository(settings.database_path)
@@ -216,6 +236,7 @@ def test_attack_api_uses_knowledge_name_for_t1046(tmp_path):
 
 
 def test_dataset_replay_duplicate_run_is_explicit(tmp_path):
+    _require_darpa_dataset()
     raws = load_raw_envelopes(DATASET)[:5]
     settings = _settings(tmp_path)
     repo = SQLiteRepository(settings.database_path)
@@ -269,3 +290,55 @@ def test_quick_fallback_aggregates_detection_findings_and_keeps_valid_evidence()
         "model_info": {"provider": "deterministic", "model": "fallback-v1", "prompt_version": "1.0.0"},
     })
     assert EvidenceValidator().validate(result, evidence_ids) == []
+
+
+def test_darpa_fixture_is_minimal_and_loads_without_external_dataset():
+    report = inspect_dataset(FIXTURE_DATASET)
+    assert report["dataset_id"] == DATASET_ID
+    assert report["dataset_name"] == DATASET_NAME
+    assert report["counts"] == {"process_events.json": 2, "network_events.json": 2, "file_events.json": 2}
+    assert report["total_events"] == 6
+    assert report["unique_event_ids"] == 6
+
+    raws = load_raw_envelopes(FIXTURE_DATASET)
+    assert len(raws) == 6
+    assert {item.payload["dataset_file"] for item in raws} == {"process_events.json", "network_events.json", "file_events.json"}
+    assert all(item.source.kind.value == "dataset" and item.source.dataset == DATASET_ID for item in raws)
+    assert all("attack_label" not in item.payload and "selection_reason" not in item.payload for item in raws)
+
+
+def test_darpa_fixture_adapter_maps_core_process_network_and_file_fields():
+    raws = load_raw_envelopes(FIXTURE_DATASET)
+    adapter = DarpaTcE3CadetsAdapter()
+
+    process = adapter.normalize(_event(raws, "fixture:process:mprotect"))[0]
+    network = adapter.normalize(_event(raws, "fixture:network:connect"))[0]
+    file_event = adapter.normalize(_event(raws, "fixture:file:execute"))[0]
+
+    assert process.action == "memory.protect"
+    assert process.host and process.host.display_name == "fixture-cadets-host"
+    assert process.actor.process and process.actor.process.attributes["subject_id"] == "fixture-subject-nginx"
+    assert "attack_label" not in process.model_dump_json()
+    assert "selection_reason" not in process.model_dump_json()
+
+    assert network.action == "network.connect"
+    assert network.network and network.network.dst.ip == "203.0.113.80"
+    assert network.network.dst.port == 80
+    assert network.network.application == "http"
+
+    assert file_event.action == "process.execute"
+    assert file_event.object.ref
+    assert file_event.object.ref.attributes["normalized_path"] == "/tmp/fixture-loader"
+
+
+def test_darpa_fixture_pipeline_produces_evidence_without_real_dataset(tmp_path):
+    raws = load_raw_envelopes(FIXTURE_DATASET)
+    settings = _settings(tmp_path)
+    repo = SQLiteRepository(settings.database_path)
+    graph = InMemoryGraphProjector()
+    result = build_pipeline(settings, repo, graph).run("run_fixture_darpa", raws)
+
+    assert result.accepted_raw == 6
+    assert len(result.events) == 6
+    assert len(result.evidence) == 6
+    assert all(item.evidence_ids for item in result.detections)

@@ -1,0 +1,58 @@
+[
+  {
+    "event_id": "fixture:process:mprotect",
+    "timestamp": "2018-04-12T18:00:22.876190369Z",
+    "timestamp_ns": 1523556022876190369,
+    "host": "fixture-cadets-host",
+    "provider": "minimal_test_fixture",
+    "event_type": "mprotect",
+    "original_event_type": "EVENT_MPROTECT",
+    "action": "aue_mprotect",
+    "process": "nginx",
+    "subject_id": "fixture-subject-nginx",
+    "parent_subject_id": "fixture-parent-master",
+    "user": "www-data",
+    "attack_label": "fixture_only",
+    "selection_reason": ["minimal_fixture_field_coverage"],
+    "evidence": {
+      "type": "SUBJECT",
+      "name": "nginx",
+      "size": 4096,
+      "properties": {
+        "cmdLine": "nginx: worker process",
+        "return_value": 0,
+        "ppid": 100
+      }
+    },
+    "quality_flags": ["minimal_fixture"],
+    "raw_location": "minimal_fixture/process_events.json#fixture:process:mprotect"
+  },
+  {
+    "event_id": "fixture:process:fork",
+    "timestamp": "2018-04-12T18:00:24.000000000Z",
+    "timestamp_ns": 1523556024000000000,
+    "host": "fixture-cadets-host",
+    "provider": "minimal_test_fixture",
+    "event_type": "process_create",
+    "original_event_type": "EVENT_FORK",
+    "action": "aue_fork",
+    "process": "sh",
+    "subject_id": "fixture-subject-shell",
+    "parent_subject_id": "fixture-subject-nginx",
+    "object_id": "fixture-object-child-shell",
+    "user": "www-data",
+    "attack_label": "fixture_only",
+    "selection_reason": ["minimal_fixture_field_coverage"],
+    "evidence": {
+      "type": "SUBJECT",
+      "name": "sh",
+      "properties": {
+        "cmdLine": "/bin/sh -c id",
+        "return_value": 0,
+        "ppid": 101
+      }
+    },
+    "quality_flags": ["minimal_fixture"],
+    "raw_location": "minimal_fixture/process_events.json#fixture:process:fork"
+  }
+]

@@ -1,0 +1,56 @@
+[
+  {
+    "event_id": "fixture:network:connect",
+    "timestamp": "2018-04-12T18:00:25.000000000Z",
+    "timestamp_ns": 1523556025000000000,
+    "host": "fixture-cadets-host",
+    "provider": "minimal_test_fixture",
+    "event_type": "connect",
+    "original_event_type": "EVENT_CONNECT",
+    "action": "aue_connect",
+    "process": "nginx",
+    "subject_id": "fixture-subject-nginx",
+    "user": "www-data",
+    "source": {"ip": "10.0.0.10", "port": 49152},
+    "destination": {"ip": "203.0.113.80", "port": 80},
+    "attack_label": "fixture_only",
+    "selection_reason": ["minimal_fixture_field_coverage"],
+    "evidence": {
+      "type": "NETFLOW",
+      "name": "connect",
+      "size": 0,
+      "properties": {
+        "return_value": 0
+      }
+    },
+    "quality_flags": ["minimal_fixture"],
+    "raw_location": "minimal_fixture/network_events.json#fixture:network:connect"
+  },
+  {
+    "event_id": "fixture:network:send",
+    "timestamp": "2018-04-12T18:00:26.000000000Z",
+    "timestamp_ns": 1523556026000000000,
+    "host": "fixture-cadets-host",
+    "provider": "minimal_test_fixture",
+    "event_type": "sendto",
+    "original_event_type": "EVENT_SENDTO",
+    "action": "aue_sendto",
+    "process": "nginx",
+    "subject_id": "fixture-subject-nginx",
+    "user": "www-data",
+    "source": {"ip": "10.0.0.10", "port": 49152},
+    "destination": {"ip": "203.0.113.80", "port": 80},
+    "attack_label": "fixture_only",
+    "selection_reason": ["minimal_fixture_field_coverage"],
+    "evidence": {
+      "type": "NETFLOW",
+      "name": "sendto",
+      "size": 512,
+      "properties": {
+        "return_value": 512
+      }
+    },
+    "quality_flags": ["minimal_fixture"],
+    "raw_location": "minimal_fixture/network_events.json#fixture:network:send"
+  }
+]

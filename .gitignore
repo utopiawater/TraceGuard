@@ -115,8 +115,14 @@ data/dataset_*/reports/*
 # ---------------------------------------------------------
 
 datasets/*
+!datasets/
 !datasets/README.md
 !datasets/sample_attack_dataset.json
+!datasets/**/
+!datasets/**/README.md
+!datasets/**/sample*.json
+datasets/darpa_tc_e3_cadets/processed_dataset/*
+datasets/darpa_tc_e3_cadets/source_metadata/*
 
 
 # ---------------------------------------------------------
