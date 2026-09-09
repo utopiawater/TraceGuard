@@ -106,5 +106,5 @@ def sources(repo: SQLiteRepository = Depends(repository)) -> dict:
     events = repo.query_events(limit=50000)
     values = {}
     for event in events:
-        values[event.source.sensor_id] = {"sensor_id": event.source.sensor_id, "kind": event.source.kind.value, "dataset": event.source.dataset, "last_event_time": event.event_time.isoformat(), "status": "healthy"}
+        values[event.source.sensor_id] = {"sensor_id": event.source.sensor_id, "kind": event.source.kind.value, "dataset": event.source.dataset, "last_event_time": event.event_time.isoformat(), "status": "ingested"}
     return response(list(values.values()))

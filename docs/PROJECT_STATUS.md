@@ -40,6 +40,9 @@ Collector / Replay / DARPA Dataset
 - Multi-Agent 保持六角色：Coordinator、Host、Network、Correlation、Attribution、Report。Quick scope 使用 Coordinator、Host、Network、Correlation；真实 LLM 不可用时明确记录 deterministic fallback。
 - Frontend 13 个页面接真实 API，不用业务 mock 伪造结果。
 - `/api/datasets` 和 Dataset 页面已读取真实 DARPA run report；Dataset 页面会展示 IOC coverage、未覆盖 IOC 构成、低语义系统调用占比和指标限制说明。
+- 前端展示层已统一中文状态、百分比置信度、AttackChain 链可信评分/完整度/阶段数说明、ATT&CK ID + 名称展示，以及 Dataset/Agent/Attribution 指标 tooltip；底层 API 字段保持不变。
+- 全局搜索已接入：顶部搜索框跳转 `/search?q=...`，后端 `/api/search` 只读查询 normalized events、detections、evidence、attack chains、sessions、Agent tasks/results 和 reports，不暴露 raw envelope、Ground Truth 或密钥类配置。
+- 数据源页面和 Agent source health 中的状态从“healthy”语义收窄为“ingested/已接入”，避免把历史事件存在误读为传感器实时健康。
 
 ## 3. DARPA TC E3 CADets 接入状态
 
@@ -104,7 +107,7 @@ py -3.13 scripts/replay_dataset.py --dataset datasets/darpa_tc_e3_cadets --data-
 
 最近一次通过的回归：
 
-- `py -3.13 -m pytest -q --basetemp data/test_tmp_full_final2`: passed
+- `py -3.13 -m pytest --basetemp data/test_tmp_closeout2`: passed，45 passed / 1 warning
 - `py -3.13 scripts/self_check.py`: passed，8 checks
 - `cd frontend; npm.cmd test`: passed，1 file / 2 tests
 - `cd frontend; npm.cmd run build`: passed
@@ -116,6 +119,16 @@ py -3.13 scripts/replay_dataset.py --dataset datasets/darpa_tc_e3_cadets --data-
 - `artifacts/release/case_1421c3d00365403d-report.html`
 
 普通自动化测试使用 Fake/Echo/Failing model，不消耗真实 LLM token。除非专门做真实模型验收，不需要重新调用 DeepSeek。
+
+答辩前 readiness 检查：
+
+```powershell
+py -3.13 scripts/demo_readiness.py
+```
+
+该脚本检查 Python、依赖、`.env`、SQLite demo 数据、历史 AttackChain/Evidence、LLM 配置、FastAPI、frontend、Neo4j、release snapshot 和 Agent EvidenceValidator；默认不要求服务必须启动，`--require-services` 可切换为硬性服务检查。`scripts/release_verify.py` 是更严格的历史真实 DeepSeek release snapshot 验收，可能因空库、服务未启动、Neo4j 未连或 release case 不存在而失败，不应作为 clean checkout 的第一条健康检查命令。
+
+本轮已修复 Windows 本地 `.env` 的非密钥路径配置：`TRACEGUARD_DATABASE_PATH`、`TRACEGUARD_RAW_ARCHIVE_DIR`、`TRACEGUARD_REPORT_DIR` 均指向项目内 `data/`。当前为验证全局搜索，已临时以 `TRACEGUARD_NEO4J_ENABLED=false` 启动 FastAPI/frontend；`py -3.13 scripts/demo_readiness.py` 通过，唯一 warning 是 `neo4j_runtime`。正式答辩前如需图数据库联通，应先启动 Neo4j 7687，再使用 `scripts/start.ps1` 启动。
 
 ## 5. 云靶场分工状态
 
@@ -134,6 +147,14 @@ py -3.13 scripts/replay_dataset.py --dataset datasets/darpa_tc_e3_cadets --data-
 
 对接文档：`docs/13_cloud_testbed_handoff.md`。
 
+真实靶场日志写库前先使用：
+
+```powershell
+py -3.13 scripts/testbed_import_dry_run.py --bundle path\to\testbed_bundle
+```
+
+dry-run 不写数据库、不生成 Detection/AttackChain，只输出节点、文件、数据源、时间范围、时间偏差、可解析/不可解析数量和缺失关键数据。
+
 ## 6. 对照小学期要求的剩余项
 
 代码侧当前建议冻结 Dataset 和主架构。后续主要是验收材料和云靶场数据对接：
@@ -141,7 +162,7 @@ py -3.13 scripts/replay_dataset.py --dataset datasets/darpa_tc_e3_cadets --data-
 1. 等云平台靶场日志 bundle 到位后，按 `docs/13_cloud_testbed_handoff.md` 导入 TraceGuard 并生成 run report。
 2. 固定一条答辩演示流程：启动系统 -> 展示七阶段 fixture -> 展示 DARPA Dataset -> 展示 Agent 调查 -> 展示报告导出。
 3. 补最终课程报告/PPT：系统架构、数据模型、检测规则、ATT&CK、AttackChain、Agent、公开数据集评估、云靶场验证、局限性。
-4. 清理或说明当前 `git status` 中 `.pytest-*` 权限受限临时目录；提交前不要误删 release artifact 或数据集原始文件。
+4. `.pytest-*` / `.tmp-*` / `data/test_tmp_*` 已加入 `.gitignore`；之前误跟踪的 pytest 临时输出应从 Git 索引移除后随本轮收口提交。
 5. 决定 Dataset 大文件策略：`processed_dataset/*.json` 建议 Git LFS 或外部下载说明；`data/dataset_e3/traceguard.db` 和 raw archive 不提交。
 
 ## 7. 当前已知限制
@@ -156,5 +177,5 @@ py -3.13 scripts/replay_dataset.py --dataset datasets/darpa_tc_e3_cadets --data-
 
 - Date: 2026-09-09
 - Branch: `main`
-- HEAD at latest committed DARPA integration: `97e66f4`
+- HEAD at latest committed DARPA/dashboard integration before closeout edits: `a13ee56`
 - Working tree note: 正常源码改动应只来自当前任务；仍可能显示既有 `.pytest-*` / `.tmp-*` 权限受限临时目录状态，提交时需显式白名单 staging。

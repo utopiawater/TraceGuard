@@ -1,7 +1,7 @@
 import { lazy, Suspense, type ReactNode } from 'react'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
-import { AttackPage, DatasetsPage, EventsPage, GraphPage, HostsPage, IncidentsPage, NetworkPage, SourcesPage } from './pages/Pages'
+import { AttackPage, DatasetsPage, EventsPage, GraphPage, HostsPage, IncidentsPage, NetworkPage, SearchPage, SourcesPage } from './pages/Pages'
 import { AgentsPage } from './pages/AgentsPage'
 import { AttributionPage } from './pages/AttributionPage'
 import { ReportsPage } from './pages/ReportsPage'
@@ -16,6 +16,7 @@ const router=createBrowserRouter([{path:'/',element:<AppShell/>,children:[
   {path:'graph',element:<GraphPage/>},{path:'hosts',element:<HostsPage/>},{path:'network',element:<NetworkPage/>},
   {path:'events',element:<EventsPage/>},{path:'agents',element:<AgentsPage/>},{path:'attack',element:<AttackPage/>},
   {path:'attribution',element:<AttributionPage/>},{path:'sources',element:<SourcesPage/>},{path:'datasets',element:<DatasetsPage/>},{path:'reports',element:<ReportsPage/>},
+  {path:'search',element:<SearchPage/>},
 ]}])
 
 export default function App(){return <RouterProvider router={router}/>}

@@ -248,7 +248,7 @@ def build_tool_gateway(repo: SQLiteRepository, graph, attack: MappingFileProvide
         for event in repo.query_events(run_id=args.get("run_id"), limit=50000):
             values[event.source.sensor_id] = {
                 "sensor_id": event.source.sensor_id, "kind": event.source.kind.value,
-                "last_event_time": event.event_time.isoformat(), "status": "healthy",
+                "last_event_time": event.event_time.isoformat(), "status": "ingested",
             }
         return {"sources": list(values.values())[:args["limit"]], "graph_runtime": graph.status() if hasattr(graph, "status") else {"connected": False}}
 

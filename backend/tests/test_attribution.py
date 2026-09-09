@@ -31,7 +31,7 @@ def test_attack_fingerprint_generation(tmp_path):
     assert "203.0.113.77" in fingerprint.ip
 
 
-def test_c2_analysis_uses_local_mock_database(tmp_path):
+def test_c2_analysis_uses_offline_intel_snapshot(tmp_path):
     repo, chain = seeded_chain(tmp_path)
     profiles = analyze_c2(AttackFingerprint.from_chain(chain, repo))
 

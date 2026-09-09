@@ -1,7 +1,7 @@
 import { Activity, BellRing, Bot, Boxes, Braces, ChevronDown, Database, FileText, Fingerprint, GitBranch, HardDrive, LayoutDashboard, Menu, Network, Radar, Search, ServerCog, ShieldCheck, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { FormEvent, useEffect, useState } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 
 type NavItem = {
@@ -82,6 +82,9 @@ function activeGroupsFor(pathname: string) {
 export function AppShell() {
   const [open, setOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const [searchText, setSearchText] = useState(params.get('q') ?? '')
   const [openGroups, setOpenGroups] = useState(() => activeGroupsFor(location.pathname))
   const { data: health, error: healthError } = useApi<{status:string;mode:'live'|'replay'|'snapshot'}>('/api/system/health')
 
@@ -90,6 +93,10 @@ export function AppShell() {
     setOpenGroups(previous => new Set([...previous, ...activeGroups]))
   }, [location.pathname])
 
+  useEffect(() => {
+    if (location.pathname === '/search') setSearchText(params.get('q') ?? '')
+  }, [location.pathname, params])
+
   const toggleGroup = (key: string) => {
     setOpenGroups(previous => {
       const next = new Set(previous)
@@ -97,6 +104,13 @@ export function AppShell() {
       else next.add(key)
       return next
     })
+  }
+
+  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const query = searchText.trim()
+    if (!query) return
+    navigate(`/search?q=${encodeURIComponent(query)}`)
   }
 
   return <div className="app-shell">
@@ -132,7 +146,7 @@ export function AppShell() {
     </aside>
     {open && <button className="scrim" aria-label="关闭导航" onClick={() => setOpen(false)} />}
     <main>
-      <header className="topbar"><div className="case-context"><Activity size={16} /><span>运行模式</span><strong>{healthError ? 'OFFLINE' : health?.mode?.toUpperCase() ?? 'CHECKING'}</strong><span className="divider" />{healthError ? '无法读取分析窗口' : '当前窗口 · 全部已接入数据'}</div><button className="search-button"><Search size={16} />搜索事件、实体或证据 <kbd>⌘ K</kbd></button></header>
+      <header className="topbar"><div className="case-context"><Activity size={16} /><span>运行模式</span><strong>{healthError ? '离线' : health?.mode === 'live' ? '实时' : health?.mode === 'snapshot' ? '快照' : '回放'}</strong><span className="divider" />{healthError ? '无法读取分析窗口' : '当前窗口 · 全部已接入数据'}</div><form className="search-button global-search" onSubmit={submitSearch}><Search size={16} /><input value={searchText} onChange={event=>setSearchText(event.target.value)} placeholder="搜索事件、实体、证据或攻击链" aria-label="全局搜索" /><kbd>Enter</kbd></form></header>
       <div className="content"><Outlet /></div>
     </main>
   </div>

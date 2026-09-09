@@ -133,6 +133,24 @@ body{
   box-shadow:var(--shadow-md);
   transform:translateY(-1px);
 }
+.search-placeholder{
+  cursor:help;
+  color:oklch(0.42 0.025 250);
+}
+.global-search{
+  cursor:text;
+}
+.global-search input{
+  min-width:0;
+  flex:1;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:var(--ink);
+}
+.global-search input::placeholder{
+  color:oklch(0.42 0.025 250);
+}
 .freshness,.badge,.status-pill,.case-context strong{
   box-shadow:inset 0 1px 0 oklch(1 0 0 / .42);
 }
@@ -779,6 +797,17 @@ tbody tr:hover{
 .node-focus span{
   color:var(--tg-accent-text);
 }
+.search-results{display:grid;gap:10px}
+.search-result{display:grid;gap:6px;padding:14px 16px;border:1px solid var(--border);border-radius:8px;background:var(--raised);color:var(--ink);text-decoration:none}
+.search-result:hover{border-color:var(--accent);box-shadow:var(--shadow-sm)}
+.search-result>div,.search-result footer{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.search-result strong{font-size:14px}
+.search-result small,.search-result p,.search-result time{color:var(--muted);font-size:12px}
+.search-result p{margin:0;line-height:1.55;overflow-wrap:anywhere}
+.search-result code{font:11px "Cascadia Code",monospace;color:var(--accent);overflow-wrap:anywhere}
+.search-type{width:max-content;border-radius:999px;padding:3px 8px;background:var(--accent-soft);color:var(--accent);font-size:11px;font-weight:700}
+.search-type.chain{background:var(--primary-soft);color:var(--primary-dark)}
+.search-type.detection{background:oklch(0.95 0.045 28);color:var(--danger)}
 @media(max-width:1020px){
   .brand{height:68px}
   .sidebar-nav{padding-top:9px}

@@ -40,6 +40,10 @@ def test_agent_attribution_and_report_resources_use_persisted_results(tmp_path):
         case_id = started.json()["data"]["case_id"]
         agents = client.get("/api/agents").json()["data"]
         assert agents[0]["case_id"] == case_id
+        dashboard = client.get("/api/dashboard").json()["data"]
+        assert {item["status"] for item in dashboard["sources"]} == {"ingested"}
+        sources = client.get("/api/sources").json()["data"]
+        assert {item["status"] for item in sources} == {"ingested"}
         assert client.get("/api/agents/%s" % case_id).json()["data"]["tasks"][-1]["agent_role"] == "report"
         attribution = client.get("/api/attribution").json()["data"]
         assert attribution[0]["status"] == "candidate_analysis"
@@ -51,6 +55,15 @@ def test_agent_attribution_and_report_resources_use_persisted_results(tmp_path):
         reports = client.get("/api/reports").json()["data"]
         assert {item["format"] for item in reports} == {"markdown", "html"}
         assert client.get(reports[0]["export_url"]).status_code == 200
+        search = client.get("/api/search?q=203.0.113.77").json()["data"]
+        assert {item["type"] for item in search} & {"event", "detection", "evidence", "chain"}
+        assert any(item["href"].startswith("/chains") for item in search)
+        scoped = client.get("/api/search?q=203.0.113.77&run_id=%s" % chain.run_id).json()["data"]
+        assert scoped
+        assert all(item["run_id"] == chain.run_id for item in scoped if item.get("run_id"))
+        dumped = json.dumps(search, ensure_ascii=False)
+        assert "envelope_json" not in dumped
+        assert "attack_label" not in dumped
 
 
 def test_quick_investigation_uses_existing_route_and_four_agent_scope(tmp_path):

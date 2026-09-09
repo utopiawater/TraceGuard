@@ -6,6 +6,7 @@ import type { components } from '../api/generated'
 import { EmptyState } from '../components/EmptyState'
 import { PageHeader } from '../components/PageHeader'
 import { useApi } from '../hooks/useApi'
+import { chainStatusName, pct, stageName } from '../lib/display'
 
 type ChainStep = components['schemas']['ChainStep']
 type Chain = components['schemas']['AttackChain']
@@ -14,6 +15,7 @@ type GraphEntity = components['schemas']['GraphEntity']
 type GraphRelation = components['schemas']['GraphRelation']
 type EntityType = GraphEntity['entity_type']
 interface Graph { nodes:GraphEntity[];edges:GraphRelation[];runtime?:{configured:boolean;connected:boolean;uri?:string;error?:string|null} }
+interface AttackTechnique { technique_id:string;technique_name:string }
 
 type HoverInfo = { title:string;subtitle:string;detail?:string;x:number;y:number }
 
@@ -72,19 +74,8 @@ function graphLabel(value: string | null | undefined, fallback: string): string 
   return `${compact.slice(0, 11)}...${compact.slice(-7)}`
 }
 
-function stageName(stage:string) {
-  return {
-    initial_access: '初始访问',
-    execution: '执行',
-    command_and_control: '命令与控制',
-    persistence: '持久化',
-    privilege_escalation: '权限提升',
-    credential_access: '凭据访问',
-    discovery: '发现',
-    lateral_movement: '横向移动',
-    collection: '收集',
-    exfiltration: '外传',
-  }[stage] ?? stage
+function stageLabel(stage:string) {
+  return stageName[stage] ?? stage
 }
 
 function stepForNode(chain: Chain, nodeId: string): ChainStep | undefined {
@@ -185,6 +176,7 @@ export function ChainPage() {
   const { data: chains, error, loading } = useApi<Chain[]>('/api/chains')
   const { data: graph } = useApi<Graph>('/api/graph')
   const { data: evidence } = useApi<Evidence[]>('/api/evidence?limit=500')
+  const { data: attack } = useApi<AttackTechnique[]>('/api/attack')
   const [params] = useSearchParams()
   const requested = params.get('chain')
   const requestedEvidence = params.get('evidence')
@@ -507,6 +499,7 @@ export function ChainPage() {
   }, [playing, chain?.chain_id])
 
   const selectedNode = graph?.nodes.find(node => node.entity_id === selectedNodeId)
+  const techniqueName = (techniqueId?: string) => attack?.find(item=>item.technique_id===techniqueId)?.technique_name
 
   const handleStageClick = (step: ChainStep) => {
     setPlaying(false)
@@ -537,9 +530,9 @@ export function ChainPage() {
 
   return <><PageHeader title="攻击链溯源" description="逐步核对时间、实体、会话、ATT&CK 映射和原始证据。" />
     {loading && <div className="skeleton-hero"/>}{error && <EmptyState kind="error" title="攻击链读取失败" detail={error}/>} {!loading && !error && !chain && <EmptyState title="尚未形成攻击链" detail="主管道产生带证据的检测并满足关联约束后，候选链会出现在这里。"/>}
-    {chain && <><section className="chain-summary"><div><span className="badge candidate">{chain.status === 'candidate' ? '候选' : chain.status}</span><h2>{chain.title}</h2></div><dl><div><dt>链分数</dt><dd>{Math.round(chain.score*100)}</dd></div><div><dt>完整度</dt><dd>{Math.round(chain.completeness*100)}%</dd></div><div><dt>步骤</dt><dd>{chain.steps.length}</dd></div></dl></section>
-      <ol className="stage-track">{chain.steps.map((step,i)=><li className={selected?.step_id===step.step_id?'active':''} key={step.step_id}><button onClick={()=>handleStageClick(step)}><span>{i+1}</span><small>{stageName(step.stage)}</small><strong>{step.technique_id}</strong></button></li>)}</ol>
-      <div className="investigation-grid"><section className="graph-panel"><div className="panel-title graph-title"><div><h2>跨源关系图</h2><span>{graph?.runtime?.connected ? 'Neo4j 已连接' : '内存切片 · Neo4j 未连接'} · 实线为事实 · 虚线为派生</span></div><div className="graph-toolbar" aria-label="图谱工具栏"><button onClick={()=>cyRef.current&&fitElements(cyRef.current, cyRef.current.elements(':visible'), 76)}><Maximize2 size={14}/>适应画布</button><button onClick={()=>zoomBy(1.18)}><ZoomIn size={14}/>放大</button><button onClick={()=>zoomBy(0.84)}><ZoomOut size={14}/>缩小</button><button onClick={resetGraph}><RotateCcw size={14}/>重置</button><button className={mainOnly?'active':''} onClick={()=>setMainOnly(true)}>只看主链</button><button onClick={()=>setMainOnly(false)}>显示全部</button><button className={playing?'active':''} onClick={()=>setPlaying(value=>!value)}><Play size={14}/>播放攻击链</button></div></div>{graph?.nodes.length ? <><div className="graph-legend"><div>{legendTypes.map(type=>{const style=entityStyle[type];return <span key={type}><i style={{background:style.color,borderColor:style.border}} />{entityLabel[type]}</span>})}</div><div><span><b className="legend-line fact"/>事实关系</span><span><b className="legend-line derived"/>推断关系</span><span><b className="legend-line path"/>当前攻击路径</span></div></div><div className="graph-canvas-wrap"><div className="graph-canvas" ref={canvas}/>{hoverInfo&&<div className="graph-hover-card" style={{left:hoverInfo.x,top:hoverInfo.y}}><strong>{hoverInfo.title}</strong><span>{hoverInfo.subtitle}</span>{hoverInfo.detail&&<small>{hoverInfo.detail}</small>}</div>}</div></> : <EmptyState title="图投影尚不可用" detail="API 已返回攻击链，但当前进程中没有可用的图投影。"/>}</section><aside className="inspector"><h2>{requestedEvidence?'Evidence 下钻':'步骤检查器'}</h2>{selectedNode&&<article className="node-focus"><span>{entityLabel[selectedNode.entity_type] ?? selectedNode.entity_type}</span><strong>{selectedNode.display_name ?? selectedNode.entity_id}</strong><code>{selectedNode.entity_id}</code></article>}{requestedEvidence&&(()=>{const item=evidence?.find(value=>value.evidence_id===requestedEvidence);return item?<article className="evidence-focus"><code>{item.evidence_id}</code><strong>{String((item.excerpt as Record<string,unknown>)?.action??item.kind)}</strong><small>{item.source_ref}</small><p>可靠性：{item.reliability} · 关联事件 {item.event_ids?.length??0} 个</p></article>:<p>该 Evidence 当前不可用。</p>})()}{selected&&<><span className="badge neutral">{stageName(selected.stage)}</span><h3>{selected.technique_id}</h3><p>{selected.explanation}</p><dl><dt>Technique</dt><dd>{selected.technique_id}</dd><dt>可信度</dt><dd>{Math.round(selected.score*100)}%</dd><dt>证据引用</dt><dd>{selected.evidence_ids.length} 条</dd></dl><div className="evidence-list">{selected.evidence_ids.map(id=>{const item=evidence?.find(value=>value.evidence_id===id);return <article key={id}><code>{id}</code>{item&&<><strong>{String((item.excerpt as Record<string,unknown>)?.action??item.kind)}</strong><small>{item.source_ref}</small></>}</article>})}</div></>}</aside></div>
+    {chain && <><section className="chain-summary"><div><span className={`badge ${chain.status==='candidate'?'candidate':'neutral'}`}>{chainStatusName[chain.status] ?? chain.status}</span><h2>{chain.title}</h2></div><dl><div><dt title="链可信评分：由步骤检测置信度和 ATT&CK 映射置信度综合得到。">链可信评分</dt><dd>{pct(chain.score)}</dd></div><div><dt title="完整度：当前链覆盖预期战术阶段的比例；不是检测准确率。">完整度</dt><dd>{pct(chain.completeness)}</dd></div><div><dt title="阶段数：系统恢复出的攻击链步骤数量。">阶段数</dt><dd>{chain.steps.length}</dd></div></dl></section>
+      <ol className="stage-track">{chain.steps.map((step,i)=><li className={selected?.step_id===step.step_id?'active':''} key={step.step_id}><button onClick={()=>handleStageClick(step)}><span>{i+1}</span><small>{stageLabel(step.stage)}</small><strong>{step.technique_id}{techniqueName(step.technique_id)?` · ${techniqueName(step.technique_id)}`:''}</strong></button></li>)}</ol>
+      <div className="investigation-grid"><section className="graph-panel"><div className="panel-title graph-title"><div><h2>跨源关系图</h2><span>{graph?.runtime?.connected ? 'Neo4j 已连接' : '内存切片 · Neo4j 未连接'} · 实线为事实 · 虚线为派生</span></div><div className="graph-toolbar" aria-label="图谱工具栏"><button onClick={()=>cyRef.current&&fitElements(cyRef.current, cyRef.current.elements(':visible'), 76)}><Maximize2 size={14}/>适应画布</button><button onClick={()=>zoomBy(1.18)}><ZoomIn size={14}/>放大</button><button onClick={()=>zoomBy(0.84)}><ZoomOut size={14}/>缩小</button><button onClick={resetGraph}><RotateCcw size={14}/>重置</button><button className={mainOnly?'active':''} onClick={()=>setMainOnly(true)}>只看主链</button><button onClick={()=>setMainOnly(false)}>显示全部</button><button className={playing?'active':''} onClick={()=>setPlaying(value=>!value)}><Play size={14}/>播放攻击链</button></div></div>{graph?.nodes.length ? <><div className="graph-legend"><div>{legendTypes.map(type=>{const style=entityStyle[type];return <span key={type}><i style={{background:style.color,borderColor:style.border}} />{entityLabel[type]}</span>})}</div><div><span><b className="legend-line fact"/>事实关系</span><span><b className="legend-line derived"/>推断关系</span><span><b className="legend-line path"/>当前攻击路径</span></div></div><div className="graph-canvas-wrap"><div className="graph-canvas" ref={canvas}/>{hoverInfo&&<div className="graph-hover-card" style={{left:hoverInfo.x,top:hoverInfo.y}}><strong>{hoverInfo.title}</strong><span>{hoverInfo.subtitle}</span>{hoverInfo.detail&&<small>{hoverInfo.detail}</small>}</div>}</div></> : <EmptyState title="图投影尚不可用" detail="API 已返回攻击链，但当前进程中没有可用的图投影。"/>}</section><aside className="inspector"><h2>{requestedEvidence?'Evidence 下钻':'步骤检查器'}</h2>{selectedNode&&<article className="node-focus"><span>{entityLabel[selectedNode.entity_type] ?? selectedNode.entity_type}</span><strong>{selectedNode.display_name ?? selectedNode.entity_id}</strong><code>{selectedNode.entity_id}</code></article>}{requestedEvidence&&(()=>{const item=evidence?.find(value=>value.evidence_id===requestedEvidence);return item?<article className="evidence-focus"><code>{item.evidence_id}</code><strong>{String((item.excerpt as Record<string,unknown>)?.action??item.kind)}</strong><small>{item.source_ref}</small><p>可靠性：{item.reliability} · 关联事件 {item.event_ids?.length??0} 个</p></article>:<p>该 Evidence 当前不可用。</p>})()}{selected&&<><span className="badge neutral">{stageLabel(selected.stage)}</span><h3>{selected.technique_id}{techniqueName(selected.technique_id)?` · ${techniqueName(selected.technique_id)}`:''}</h3><p>{selected.explanation}</p><dl><dt>Technique</dt><dd>{selected.technique_id}{techniqueName(selected.technique_id)?` · ${techniqueName(selected.technique_id)}`:''}</dd><dt title="该步骤可信度由 Detection 置信度和 ATT&CK 映射置信度相乘得到。">步骤可信度</dt><dd>{pct(selected.score)}</dd><dt>证据引用</dt><dd>{selected.evidence_ids.length} 条</dd></dl><div className="evidence-list">{selected.evidence_ids.map(id=>{const item=evidence?.find(value=>value.evidence_id===id);return <article key={id}><code>{id}</code>{item&&<><strong>{String((item.excerpt as Record<string,unknown>)?.action??item.kind)}</strong><small>{item.source_ref}</small></>}</article>})}</div></>}</aside></div>
       {!!chain.uncertainties?.length&&<section className="uncertainty"><strong>尚未证实</strong>{chain.uncertainties.map(item=><p key={item}>{item}</p>)}</section>}</>}
   </>
 }

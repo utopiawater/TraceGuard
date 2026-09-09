@@ -41,6 +41,18 @@ Web 固定入口为 `http://127.0.0.1:5173`，API 文档为 `http://127.0.0.1:80
 powershell -ExecutionPolicy Bypass -File .\scripts\stop.ps1
 ```
 
+答辩前可以先运行 demo readiness 检查。它会检查 Python 版本、依赖、`.env`、SQLite、历史 AttackChain/Evidence、LLM 配置、前后端服务和 Neo4j 可用性；默认不要求服务必须已经启动，也不会伪造真实 LLM 结果：
+
+```powershell
+.\.venv\Scripts\python.exe scripts/demo_readiness.py
+```
+
+如果要把正在运行的前后端和 Neo4j 也作为硬性验收：
+
+```powershell
+.\.venv\Scripts\python.exe scripts/demo_readiness.py --require-services
+```
+
 需要重新生成七阶段演示数据时，在服务停止状态执行：
 
 ```powershell
@@ -78,3 +90,9 @@ npm run build
 DARPA TC E3 CADets 公开数据集已接入统一主管道，当前验证规模为 20,776 条事件，生成 348 条 Detection、1 条 AttackChain 和可回查 Evidence。数据集页面同时展示未覆盖 IOC 的主要 action、event_type 和 process 分布，便于答辩时说明 coverage 限制。若没有生成过 `data/dataset_e3/dataset_run_report.json`，数据集页面会保持真实空状态，不使用 Mock 数据。
 
 8+ 节点真实靶场由云平台同学部署。本仓库提供拓扑、采集规范和日志 bundle 接入契约；云端导出的 Wazuh/Sysmon/Auditd/Zeek 日志到位后，可按 `docs/13_cloud_testbed_handoff.md` 接入 TraceGuard。
+
+真实靶场日志写库前先做 dry-run，检查节点、文件、数据源、时间范围、时间偏差、可解析数量和缺失关键数据：
+
+```powershell
+.\.venv\Scripts\python.exe scripts/testbed_import_dry_run.py --bundle path\to\testbed_bundle
+```

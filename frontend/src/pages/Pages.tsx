@@ -2,6 +2,8 @@ import { ResourcePage } from '../components/ResourcePage'
 import { EmptyState } from '../components/EmptyState'
 import { PageHeader } from '../components/PageHeader'
 import { useApi } from '../hooks/useApi'
+import { pct } from '../lib/display'
+import { Link, useSearchParams } from 'react-router-dom'
 
 export const IncidentsPage=()=> <ResourcePage title="攻击事件中心" description="审阅确定性检测、置信度、ATT&CK 映射与证据数量。" endpoint="/api/detections" columns={[["title","事件"],["severity","严重度"],["confidence","置信度"],["attack_mappings.0.subtechnique_id|attack_mappings.0.technique_id","ATT&CK"],["rule_id","规则"],["created_at","发生时间"]]}/>
 export const GraphPage=()=> <ResourcePage title="安全知识图谱" description="查看规范化实体与有证据引用的行为关系。" endpoint="/api/entities" columns={[["display_name","实体"],["entity_type","类型"],["first_seen","首次出现"],["last_seen","最后出现"]]}/>
@@ -10,6 +12,24 @@ export const NetworkPage=()=> <ResourcePage title="网络流量分析" descripti
 export const EventsPage=()=> <ResourcePage title="日志与安全事件" description="检索统一事件并沿 provenance 回查原始记录。" endpoint="/api/events" columns={[["event_time","事件时间"],["source.kind","来源"],["host.display_name","主机"],["action","动作"],["event_type","类型"],["message","摘要"],["provenance.parser_name","解析器"]]}/>
 export const AttackPage=()=> <ResourcePage title="ATT&CK 分析" description="查看固定版本的 Technique 覆盖、映射规则与证据数量。" endpoint="/api/attack" columns={[["technique_id","Technique"],["technique_name","名称"],["detection_count","检测"],["evidence_count","证据"],["attack_version","版本"]]}/>
 export const SourcesPage=()=> <ResourcePage title="数据源与资产" description="检查传感器、最后事件、时间质量、dead-letter 与资产覆盖。" endpoint="/api/sources" columns={[["sensor_id","传感器"],["kind","来源"],["dataset","数据集"],["status","状态"],["last_event_time","最后事件"]]}/>
+
+interface SearchResult { type:string;type_label:string;id:string;title:string;subtitle:string;href:string;run_id?:string|null;timestamp?:string|null;match:string }
+
+export const SearchPage=()=> {
+  const [params] = useSearchParams()
+  const query = params.get('q')?.trim() ?? ''
+  const endpoint = query ? `/api/search?q=${encodeURIComponent(query)}&limit=60` : '/api/search?q=__empty__&limit=1'
+  const { data, loading, error, meta } = useApi<SearchResult[]>(endpoint)
+  const results = query ? data ?? [] : []
+  return <><PageHeader title="全局搜索" description="检索已入库的规范化事件、Detection、Evidence、AttackChain、Agent 调查和报告；不读取 Ground Truth 或原始密钥类配置。" aside={query ? <span className="freshness">{results.length} 条结果</span> : undefined} />
+    {!query && <EmptyState title="输入关键词开始搜索" detail="可以搜索 IP、进程名、文件路径、Technique ID、Evidence ID、Detection ID、Case ID 或 run_id。" />}
+    {query && loading && <div className="skeleton-list"><span/><span/><span/></div>}
+    {query && error && <EmptyState kind="error" title="搜索失败" detail={error}/>}
+    {query && !loading && !error && results.length === 0 && <EmptyState title="没有匹配结果" detail={meta?.warnings[0] ?? '换一个更具体的 ID、IP、进程名或 Evidence 编号再试。'} />}
+    {query && !!results.length && <section className="search-results">{results.map(item=><Link className="search-result" to={item.href} key={`${item.type}-${item.id}`}><div><span className={`search-type ${item.type}`}>{item.type_label}</span>{item.run_id&&<code>{item.run_id}</code>}</div><strong>{item.title}</strong><small>{item.subtitle}</small><p>{item.match}</p><footer><code>{item.id}</code>{item.timestamp&&<time>{new Date(item.timestamp).toLocaleString('zh-CN')}</time>}</footer></Link>)}</section>}
+  </>
+}
+
 interface DatasetRun {
   dataset_id: string
   dataset_name: string
@@ -68,19 +88,19 @@ export const DatasetsPage=()=> {
         <Metric label="输入事件" value={run.records} />
         <Metric label="成功标准化" value={run.normalized_records} />
         <Metric label="失败事件" value={run.failed_records} />
-        <Metric label="映射率" value={pct(run.mapping_rate)} />
+        <Metric label="映射率" value={pct(run.mapping_rate, 1)} title="成功转换为 UnifiedSecurityEvent 的事件比例。" />
         <Metric label="Detection" value={run.detection_count} />
         <Metric label="ATT&CK Technique" value={run.technique_count} />
         <Metric label="AttackChain" value={run.chain_count} />
-        <Metric label="Evidence 回查率" value={pct(run.evidence_backtrace_rate)} />
+        <Metric label="Evidence 回查率" value={pct(run.evidence_backtrace_rate, 1)} title="检测和攻击链引用的 Evidence 能回到原始记录的比例。" />
       </div>
       <div className="dataset-detail-grid">
         <article>
           <h2>实验结果</h2>
           <dl>
             <div><dt>Run ID</dt><dd><code>{run.run_id}</code></dd></div>
-            <div><dt>IOC 覆盖</dt><dd>{coverage(run.ioc_coverage)}</dd></div>
-            <div><dt>攻击阶段覆盖</dt><dd>{coverage(run.stage_coverage)}</dd></div>
+            <div><dt title="只在独立 Evaluation 中对照官方 IOC，不反向参与 Detection。">IOC 覆盖</dt><dd>{coverage(run.ioc_coverage)}</dd></div>
+            <div><dt title="系统恢复出的阶段与 Ground Truth 场景步骤的对照，不代表逐事件分类准确率。">攻击阶段覆盖</dt><dd>{coverage(run.stage_coverage)}</dd></div>
             <div><dt>运行耗时</dt><dd>{run.runtime_seconds}s</dd></div>
           </dl>
         </article>
@@ -110,7 +130,7 @@ function IocCoverageAnalysis({analysis}:{analysis:NonNullable<DatasetRun['ioc_co
     ['网络 IOC', analysis.network_ioc_events],
     ['文件 IOC', analysis.file_ioc_events],
     ['低语义系统调用', analysis.low_semantic_syscall_events],
-    ['低语义占比', pct(analysis.low_semantic_rate)],
+    ['低语义占比', pct(analysis.low_semantic_rate, 1)],
   ]
   return <section className="ioc-analysis">
     <header>
@@ -145,12 +165,8 @@ function Distribution({title, values}:{title:string; values?:Record<string, numb
   </article>
 }
 
-function Metric({label,value}:{label:string;value:string|number}) {
-  return <div><span>{label}</span><strong>{value}</strong></div>
-}
-
-function pct(value: number | null | undefined) {
-  return value == null ? 'N/A' : `${(value * 100).toFixed(1)}%`
+function Metric({label,value,title}:{label:string;value:string|number;title?:string}) {
+  return <div><span title={title}>{label}</span><strong>{value}</strong></div>
 }
 
 function score(value: number | null | undefined) {
@@ -159,5 +175,5 @@ function score(value: number | null | undefined) {
 
 function coverage(value?: {covered:number;total:number;rate:number|null}) {
   if (!value) return 'N/A'
-  return `${value.covered}/${value.total}${value.rate == null ? '' : ` · ${pct(value.rate)}`}`
+  return `${value.covered}/${value.total}${value.rate == null ? '' : ` · ${pct(value.rate, 1)}`}`
 }

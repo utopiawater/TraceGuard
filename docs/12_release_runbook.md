@@ -31,6 +31,14 @@ powershell -ExecutionPolicy Bypass -File .\scripts\stop.ps1
 
 `check.ps1` verifies Python/OpenSSL, Python packages, `.env`, non-secret LLM configuration, Neo4j, SQLite, FastAPI, frontend, and LLM reachability. Its output includes only whether an API Key is configured; it never prints the Key.
 
+For a softer pre-defense readiness check, run:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/demo_readiness.py
+```
+
+It checks runtime, dependency, `.env`, SQLite demo data, historical AttackChain/Evidence, LLM configuration, FastAPI, frontend, Neo4j, release snapshot, and Agent EvidenceValidator readiness. By default, stopped services are reported as warnings rather than hard failures. Use `--require-services` when the demo machine should already have FastAPI, frontend, and Neo4j running. Use `--require-real-llm` only for a deliberate real-model acceptance run; the readiness check never fabricates `real_llm` status.
+
 ## Agent demonstration modes
 
 - Quick: `POST /api/chains/{chain_id}/investigate?scope=quick&max_steps=4`
@@ -51,6 +59,8 @@ The immutable release evidence for the successful DeepSeek run is:
 - Reports: `artifacts/release/case_1421c3d00365403d-report.md` and `.html`
 
 Automated tests use a Fake ModelClient and do not consume real LLM tokens.
+
+`scripts/release_verify.py` is intentionally stricter than the readiness check. It validates the archived DeepSeek acceptance snapshot, the exact release case and chain IDs, the report integrity hash, the six-Agent sequence, EvidenceValidator output, Neo4j, FastAPI, and frontend availability. It is expected to fail on an empty database, a machine without the archived release DB, stopped services, or a different token/accounting snapshot. Use it for release artifact verification, not as the first command on a clean checkout.
 
 ## Public dataset replay
 
@@ -76,3 +86,11 @@ Ground Truth, official IOC, `attack_graph.json`, `attack_timeline.json`, and `ag
 Wazuh JSON, Sysmon XML, Auditd compound records, and Zeek JSON can enter the existing Adapter registry and unified pipeline without changing Contracts, SQLite schema, graph model, Detection engine, AttackChain, or Agent architecture. Ground Truth remains evaluation metadata and must not be silently converted into observed evidence.
 
 The physical or cloud 8+ node testbed is owned by the testbed teammates. TraceGuard expects a replay bundle plus a scenario manifest. Keep node deployment screenshots, sensor health screenshots, exported logs, and rollback evidence with the final submission. See `docs/13_cloud_testbed_handoff.md`.
+
+Before importing the final bundle into SQLite, run a dry-run:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/testbed_import_dry_run.py --bundle path\to\testbed_bundle
+```
+
+The dry-run writes no database records, generates no Detection or AttackChain, and reports nodes, files, source types, time range, clock offsets, parseable/unparseable counts, and missing critical data.

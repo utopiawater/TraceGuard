@@ -12,6 +12,8 @@ __pycache__/
 *$py.class
 
 .pytest_cache/
+.pytest-*/
+.tmp-*/
 .mypy_cache/
 .ruff_cache/
 .cache/
@@ -95,6 +97,7 @@ data/raw/*
 data/reports/*
 data/dataset_*/raw/*
 data/dataset_*/reports/*
+data/test_tmp_*/
 
 # 如果以后需要保留空目录，可以放 .gitkeep
 !data/raw/.gitkeep

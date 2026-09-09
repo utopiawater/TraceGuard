@@ -134,6 +134,21 @@ Ground Truth manifest 只用于最终 evaluation，不进入 Detection、ATT&CK�
 - Agent findings 通过 EvidenceValidator。
 - 报告中明确 Ground Truth 只用于对照。
 
+正式写库前先做 dry-run：
+
+```powershell
+.\.venv\Scripts\python.exe scripts/testbed_import_dry_run.py --bundle path\to\testbed_bundle
+```
+
+dry-run 只审计输入，不写 SQLite、不生成 Detection、不生成 AttackChain。输出包括：
+
+- run manifest 中的 `scenario_id`、`run_id`、节点、时区和时间同步要求。
+- bundle 内可识别文件、数据源类型和每类 source 数量。
+- 可解析/不可解析记录数量、缺失关键数据、时间范围和发现的 clock offset。
+- 是否缺少 Sysmon/Windows Security、Auditd/Wazuh、Zeek/network、manifest、节点清单或时间同步证据。
+
+只有 dry-run 通过后，才进入正式导入。正式导入仍必须走 `RawEventEnvelope -> UnifiedSecurityEvent -> Session -> Detection -> Evidence -> ATT&CK -> AttackChain`，不得根据 `steps`、`attack_timeline` 或预期 ATT&CK 阶段直接生成 Detection。
+
 ## 7. 不要交付的内容
 
 - 真实公网攻击目标。

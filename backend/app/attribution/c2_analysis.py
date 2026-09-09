@@ -17,7 +17,7 @@ class C2Profile(ContractModel):
     tls_fingerprint: str | None = None
 
 
-MOCK_C2_DB = {
+OFFLINE_C2_INTEL_SNAPSHOT = {
     "203.0.113.77": {
         "asn": "AS64512 LAB-NET",
         "historical_ip": ["198.51.100.24", "203.0.113.77"],
@@ -39,17 +39,17 @@ def analyze_c2(fingerprint: AttackFingerprint, port: int | None = None, protocol
     indicators = [(domain, None) for domain in fingerprint.domain] + [(None, ip) for ip in fingerprint.ip]
     for domain, ip in indicators:
         key = domain or ip or ""
-        mock = MOCK_C2_DB.get(key, {})
+        snapshot = OFFLINE_C2_INTEL_SNAPSHOT.get(key, {})
         profiles.append(C2Profile(
             domain=domain,
             ip=ip,
             port=port or (443 if fingerprint.user_agent or protocol == "https" else None),
             protocol=protocol or ("https" if fingerprint.user_agent else None),
             user_agent=fingerprint.user_agent[0] if fingerprint.user_agent else None,
-            domain_age=mock.get("domain_age"),
-            asn=mock.get("asn"),
-            related_domains=mock.get("related_domains", []),
-            historical_ip=mock.get("historical_ip", []),
-            tls_fingerprint=mock.get("tls_fingerprint"),
+            domain_age=snapshot.get("domain_age"),
+            asn=snapshot.get("asn"),
+            related_domains=snapshot.get("related_domains", []),
+            historical_ip=snapshot.get("historical_ip", []),
+            tls_fingerprint=snapshot.get("tls_fingerprint"),
         ))
     return profiles
