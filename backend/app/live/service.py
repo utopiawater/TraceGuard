@@ -1,6 +1,6 @@
 import json
 import re
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterable, List, Optional
 
@@ -28,6 +28,10 @@ class LiveRunService:
         now = utc_now()
         run_id = "live_%s_%s" % (now.strftime("%Y%m%d_%H%M%S"), stable_id("run", now.isoformat()).split("_", 1)[1][:8])
         configured_replay = self._configured_replay_path(replay_path)
+        if configured_replay and not Path(configured_replay).exists():
+            raise FileNotFoundError("demo evidence source is unavailable")
+        if not configured_replay and not self.settings.wazuh_jsonl_paths and not self.settings.zeek_log_roots:
+            raise FileNotFoundError("no live evidence source is configured")
         source = "demo_replay" if configured_replay else "live"
         manifest = {
             "source": source,
@@ -88,16 +92,31 @@ class LiveRunService:
     def status(self, run_id: Optional[str] = None) -> dict:
         run = self.repository.get_run(run_id) if run_id else self.repository.current_live_run()
         counts = self.repository.counts(run_id=run["run_id"]) if run else {}
-        chains = self.repository.list_chains(1, run_id=run["run_id"]) if run else []
+        chains = self.repository.list_chains(100, run_id=run["run_id"]) if run else []
+        detections = self.repository.all_detections(run_id=run["run_id"]) if run else []
+        techniques = {mapping.subtechnique_id or mapping.technique_id for detection in detections for mapping in detection.attack_mappings}
+        techniques.update(technique_id for chain in chains for technique_id in chain.technique_ids)
+        live_sources = self.repository.list_live_sources(run["run_id"]) if run else []
+        network_events = self.repository.count_events(run_id=run["run_id"], actions=["network.", "http.", "dns.", "icmp."]) if run else 0
+        recent_events = self.repository.query_events(run_id=run["run_id"], limit=500, descending=True) if run else []
+        active_entities = _active_entity_count(recent_events)
+        display_sources = _business_sources(live_sources)
         return {
             "run_id": run["run_id"] if run else None,
             "mode": run.get("mode") if run else "live",
             "status": run.get("status") if run else "idle",
             "started_at": run.get("started_at") if run else None,
             "completed_at": run.get("completed_at") if run else None,
-            "sources": self.repository.list_live_sources(run["run_id"]) if run else [],
+            "elapsed_seconds": _elapsed_seconds(run) if run else 0,
+            "sources": live_sources,
+            "display_sources": display_sources,
             "counts": counts,
-            "attack_chain_stages": len(chains[0].steps) if chains else 0,
+            "attack_chain_stages": max((len(chain.steps) for chain in chains), default=0),
+            "attack_techniques": len(techniques),
+            "network_events": network_events,
+            "active_entities": active_entities,
+            "data_access_method": _data_access_method(run),
+            "phase_progress": _phase_progress(counts, display_sources, len(techniques), max((len(chain.steps) for chain in chains), default=0)),
         }
 
     def collectors(self, replay_path: Optional[str] = None, run_id: Optional[str] = None) -> List:
@@ -116,7 +135,29 @@ class LiveRunService:
         return collectors
 
     def _configured_replay_path(self, replay_path: Optional[str] = None) -> Optional[str]:
-        return replay_path or self.settings.demo_bundle_path or self.settings.live_replay_path or None
+        if replay_path:
+            return str(self._resolve_replay_path(replay_path))
+        if self.settings.live_replay_path:
+            return str(self._resolve_replay_path(self.settings.live_replay_path))
+        if self.settings.wazuh_jsonl_paths or self.settings.zeek_log_roots:
+            return None
+        if self.settings.demo_bundle_path:
+            return str(self._resolve_replay_path(self.settings.demo_bundle_path))
+        return None
+
+    def _resolve_replay_path(self, value: str) -> Path:
+        path = Path(value)
+        if path.is_absolute():
+            return path
+        candidates = [
+            Path.cwd() / path,
+            self.settings.data_dir.parent / path,
+            Path(__file__).parents[3] / path,
+        ]
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+        return candidates[-1]
 
     def _bundle_loader(self, run_id: Optional[str]):
         task_id = "live_replay_%s" % (run_id or stable_id("live_replay", utc_now().isoformat()).split("_", 1)[1][:8])
@@ -144,18 +185,18 @@ class LiveRunService:
 
     def _apply_replay_clock(self, envelopes: List[RawEventEnvelope]) -> List[RawEventEnvelope]:
         now = utc_now()
-        newest_original = max(item.observed_time for item in envelopes)
         compression = self._time_compression()
+        spread_seconds = 1.0 if len(envelopes) > 1 else 0.0
         mapped: List[RawEventEnvelope] = []
-        for raw in envelopes:
-            lag = min(max((newest_original - raw.observed_time).total_seconds() / compression, 0), 85)
+        for index, raw in enumerate(envelopes):
+            lag = ((len(envelopes) - 1 - index) / max(len(envelopes) - 1, 1)) * spread_seconds
             replay_time = now - timedelta(seconds=lag)
             labels = {
                 **raw.labels,
                 "original_event_time": raw.event_time_raw if raw.event_time_raw is not None else raw.observed_time.isoformat(),
                 "original_payload_time": self._payload_time(raw.payload),
                 "replay_arrived_at": now.isoformat(),
-                "replay_clock": "compressed_current_time",
+                "replay_clock": "current_arrival_time",
                 "replay_time_compression": compression,
             }
             payload = self._payload_with_replay_time(raw.payload, replay_time)
@@ -226,3 +267,119 @@ def _manifest_value(run: Optional[dict], key: str) -> Optional[str]:
         return None
     value = manifest.get(key)
     return str(value) if value else None
+
+
+def _elapsed_seconds(run: dict) -> int:
+    started = _parse_run_time(run.get("started_at"))
+    if not started:
+        return 0
+    ended = _parse_run_time(run.get("completed_at")) if run.get("completed_at") else utc_now()
+    return max(int((ended - started).total_seconds()), 0)
+
+
+def _parse_run_time(value: Optional[str]) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _data_access_method(run: Optional[dict]) -> str:
+    if not run:
+        return "未启动"
+    source = _manifest_value(run, "source")
+    if source == "demo_replay":
+        return "靶场证据准实时接入"
+    return "在线采集接入"
+
+
+def _business_sources(sources: List[dict]) -> List[dict]:
+    groups = {
+        "windows": {"label": "Windows 安全日志", "events_received": 0, "last_seen": None, "active": False},
+        "linux": {"label": "Linux 主机行为", "events_received": 0, "last_seen": None, "active": False},
+        "web": {"label": "Web 访问日志", "events_received": 0, "last_seen": None, "active": False},
+        "network": {"label": "网络流量", "events_received": 0, "last_seen": None, "active": False},
+        "c2": {"label": "C2 通信", "events_received": 0, "last_seen": None, "active": False},
+    }
+    for source in sources:
+        key = _business_source_key(source)
+        if not key:
+            continue
+        group = groups[key]
+        count = int(source.get("events_received") or 0)
+        group["events_received"] = int(group["events_received"]) + count
+        group["active"] = bool(group["active"] or count > 0 or source.get("status") == "online" and source.get("last_seen"))
+        seen = source.get("last_seen")
+        if seen and (not group["last_seen"] or str(seen) > str(group["last_seen"])):
+            group["last_seen"] = seen
+    values = []
+    for key, group in groups.items():
+        count = int(group["events_received"])
+        status = "normal" if count > 0 else "waiting"
+        if group["active"] and count == 0:
+            status = "ingesting"
+        values.append({"key": key, **group, "status": status})
+    return values
+
+
+def _business_source_key(source: dict) -> Optional[str]:
+    source_id = str(source.get("source_id") or "").lower()
+    source_type = str(source.get("source_type") or "").lower()
+    if source_type in {"windows_security", "sysmon"}:
+        return "windows"
+    if source_type == "auditd":
+        return "linux"
+    if source_type == "zeek":
+        return "network"
+    if source_type == "application" and ("c2" in source_id or "http_final" in source_id):
+        return "c2"
+    if source_type == "application":
+        return "web"
+    return None
+
+
+def _active_entity_count(events) -> int:
+    entities = set()
+
+    def add_ref(ref) -> None:
+        if ref and getattr(ref, "entity_id", None):
+            entities.add(ref.entity_id)
+
+    for event in events:
+        add_ref(event.host)
+        if event.actor:
+            add_ref(event.actor.user)
+            add_ref(event.actor.process)
+            add_ref(event.actor.parent_process)
+        if event.object:
+            add_ref(event.object.ref)
+        if event.network:
+            for endpoint in (event.network.src, event.network.dst):
+                for value in (endpoint.host_id, endpoint.ip):
+                    if value:
+                        entities.add(value)
+    return len(entities)
+
+
+def _phase_progress(counts: dict, display_sources: List[dict], techniques: int, chain_stages: int) -> List[dict]:
+    host_active = any(item["key"] in {"windows", "linux"} and item["events_received"] > 0 for item in display_sources)
+    network_active = any(item["key"] in {"network", "c2"} and item["events_received"] > 0 for item in display_sources)
+    phases = [
+        ("init", "初始化监测任务", bool(display_sources)),
+        ("host", "接入主机安全日志", host_active),
+        ("network", "接入网络流量", network_active),
+        ("normalize", "标准化安全事件", int(counts.get("normalized_events") or 0) > 0),
+        ("detect", "执行威胁检测", int(counts.get("detections") or 0) > 0 or techniques > 0),
+        ("chain", "构建攻击关联", chain_stages > 0),
+    ]
+    first_pending_seen = False
+    result = []
+    for key, label, done in phases:
+        state = "done" if done else "pending"
+        if not done and not first_pending_seen:
+            state = "active"
+            first_pending_seen = True
+        result.append({"key": key, "label": label, "state": state})
+    return result

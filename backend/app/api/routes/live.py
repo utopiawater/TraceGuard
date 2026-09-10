@@ -47,7 +47,10 @@ def live_service(request: Request, repo: SQLiteRepository = Depends(repository),
 def start_live(payload: StartLiveRequest | None = None, service: LiveRunService = Depends(live_service)) -> dict:
     if payload and payload.replay_path:
         raise HTTPException(status_code=400, detail="live replay path is controlled by server configuration")
-    return response(service.start())
+    try:
+        return response(service.start())
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=400, detail="内置实时监测数据源不可用，请检查 TRACEGUARD_DEMO_BUNDLE_PATH。") from exc
 
 
 @router.get("/v1/live/status")
@@ -78,18 +81,21 @@ def live_traffic(
             "eps": 0,
             "recent_events": [],
         })
-    if not repo.get_run(run_id):
+    run = repo.get_run(run_id)
+    if not run:
         raise HTTPException(status_code=404, detail="live run not found")
     window = max(30, min(window_seconds, 180))
     bucket = max(1, min(bucket_seconds, 30))
     now = utc_now()
-    start = now - timedelta(seconds=window)
+    recent_source_events = repo.query_events(run_id=run_id, limit=12, descending=True)
+    anchor = recent_source_events[0].event_time if recent_source_events else now
+    start = anchor - timedelta(seconds=window)
     bucket_count = int(window / bucket) + 1
     bucket_starts = [start + timedelta(seconds=index * bucket) for index in range(bucket_count)]
     network = [0 for _ in bucket_starts]
     endpoint = [0 for _ in bucket_starts]
     total = [0 for _ in bucket_starts]
-    events = repo.query_events(run_id=run_id, start_time=start.isoformat(), end_time=now.isoformat(), limit=2000)
+    events = repo.query_events(run_id=run_id, start_time=start.isoformat(), end_time=anchor.isoformat(), limit=2000)
     for event in events:
         offset = int((event.event_time - start).total_seconds() // bucket)
         if offset < 0 or offset >= len(bucket_starts):
@@ -101,7 +107,7 @@ def live_traffic(
             endpoint[offset] += 1
         total[offset] += 1
     recent_events = []
-    for event in repo.query_events(run_id=run_id, limit=12, descending=True):
+    for event in recent_source_events:
         src = event.network.src.ip if event.network and event.network.src else None
         dst = event.network.dst.ip if event.network and event.network.dst else None
         recent_events.append({
@@ -115,7 +121,7 @@ def live_traffic(
             "message": event.message,
         })
     eps_window = max(min(window, 15), 1)
-    eps_start = now - timedelta(seconds=eps_window)
+    eps_start = anchor - timedelta(seconds=eps_window)
     eps = sum(1 for event in events if event.event_time >= eps_start) / eps_window
     return response({
         "run_id": run_id,

@@ -33,7 +33,7 @@ class ReplayLiveCollector:
 
     def poll_new_events(self, cursor: Optional[dict] = None, max_records: Optional[int] = None) -> LivePollResult:
         if not self.path.exists():
-            return LivePollResult(cursor=cursor or {}, online=False, last_error="replay source missing: %s" % self.path)
+            return LivePollResult(cursor=cursor or {}, online=False, last_error="configured evidence source is unavailable")
         try:
             records = self._records()
             index = int((cursor or {}).get("index", 0))
@@ -52,10 +52,42 @@ class ReplayLiveCollector:
             records = load_scenario(self.path)
         else:
             records = ReplayCollector(self.path).collect()
-        records = sorted(records, key=lambda item: item.observed_time)
+        records = self._sort_for_replay(records)
         if self.cache_key:
             self._records_cache[self.cache_key] = records
         return records
+
+    @staticmethod
+    def _sort_for_replay(records: List[RawEventEnvelope]) -> List[RawEventEnvelope]:
+        if not records:
+            return []
+        first_seen: Dict[str, Any] = {}
+        for record in records:
+            key = _replay_source_key(record)
+            first = first_seen.get(key)
+            if first is None or record.observed_time < first:
+                first_seen[key] = record.observed_time
+        if len(first_seen) <= 1:
+            return sorted(records, key=lambda item: item.observed_time)
+        first_span = max(first_seen.values()) - min(first_seen.values())
+        if first_span.total_seconds() < 3600:
+            return sorted(records, key=lambda item: item.observed_time)
+        return sorted(
+            records,
+            key=lambda item: (
+                (item.observed_time - first_seen[_replay_source_key(item)]).total_seconds(),
+                _replay_source_key(item),
+                item.observed_time,
+            ),
+        )
+
+
+def _replay_source_key(record: RawEventEnvelope) -> str:
+    return "%s:%s:%s" % (
+        record.source.kind.value,
+        record.source.dataset,
+        record.labels.get("source_id") or record.source.sensor_id or "",
+    )
 
 
 class _TailFileCollector:

@@ -40,6 +40,7 @@ if (-not (Test-Path -LiteralPath $runtimeDir)) {
 }
 
 $neo4jStarted = $false
+$neo4jEnabled = $true
 if (-not (Get-NetTCPConnection -State Listen -LocalPort 7687 -ErrorAction SilentlyContinue)) {
     if (Get-Command docker -ErrorAction SilentlyContinue) {
         Push-Location -LiteralPath $projectRoot
@@ -51,7 +52,8 @@ if (-not (Get-NetTCPConnection -State Listen -LocalPort 7687 -ErrorAction Silent
             Pop-Location
         }
     } else {
-        throw "Neo4j is offline and Docker is unavailable. Start Neo4j on port 7687 first."
+        $neo4jEnabled = $false
+        Write-Warning "Neo4j is offline and Docker is unavailable. Starting with in-memory graph projection."
     }
 }
 
@@ -59,24 +61,35 @@ $env:TRACEGUARD_DATA_DIR = Join-Path $projectRoot "data"
 $env:TRACEGUARD_DATABASE_PATH = Join-Path $projectRoot "data\traceguard.db"
 $env:TRACEGUARD_RAW_ARCHIVE_DIR = Join-Path $projectRoot "data\raw"
 $env:TRACEGUARD_REPORT_DIR = Join-Path $projectRoot "data\reports"
+$env:TRACEGUARD_DEMO_BUNDLE_PATH = Join-Path $projectRoot "data\testbed_bundles\attack_demo.zip"
+$env:TRACEGUARD_LIVE_POLL_INTERVAL_SECONDS = "1"
+$env:TRACEGUARD_LIVE_MICRO_BATCH_SIZE = "200"
+$env:TRACEGUARD_NEO4J_ENABLED = if ($neo4jEnabled) { "true" } else { "false" }
 $env:TRACEGUARD_NEO4J_URI = "bolt://127.0.0.1:7687"
 $env:LLM_TIMEOUT_SECONDS = "180"
 $env:PYTHONUNBUFFERED = "1"
+$env:PYTHONPATH = Join-Path $projectRoot "backend"
 
 $backend = Start-Process -FilePath $python -ArgumentList @("-m", "uvicorn", "app.main:app", "--app-dir", "backend", "--host", "127.0.0.1", "--port", "$ApiPort") -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput (Join-Path $runtimeDir "backend.stdout.log") -RedirectStandardError (Join-Path $runtimeDir "backend.stderr.log") -PassThru
+$worker = Start-Process -FilePath $python -ArgumentList @("-m", "app.worker") -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput (Join-Path $runtimeDir "worker.stdout.log") -RedirectStandardError (Join-Path $runtimeDir "worker.stderr.log") -PassThru
 $node = (Get-Command node -ErrorAction Stop).Source
 $frontend = Start-Process -FilePath $node -ArgumentList @($vite, "--host", "127.0.0.1", "--port", "$FrontendPort", "--strictPort") -WorkingDirectory (Join-Path $projectRoot "frontend") -WindowStyle Hidden -RedirectStandardOutput (Join-Path $runtimeDir "frontend.stdout.log") -RedirectStandardError (Join-Path $runtimeDir "frontend.stderr.log") -PassThru
 
-$state = @{
-    api_port = $ApiPort
-    frontend_port = $FrontendPort
-    neo4j_started_by_script = $neo4jStarted
-    processes = @(
-        @{ name = "backend"; id = $backend.Id; path = $backend.Path; started_at = $backend.StartTime.ToUniversalTime().ToString("o") },
-        @{ name = "frontend"; id = $frontend.Id; path = $frontend.Path; started_at = $frontend.StartTime.ToUniversalTime().ToString("o") }
-    )
+function Save-TraceGuardState {
+    param($FrontendProcess)
+    $state = @{
+        api_port = $ApiPort
+        frontend_port = $FrontendPort
+        neo4j_started_by_script = $neo4jStarted
+        processes = @(
+            @{ name = "backend"; id = $backend.Id; path = $backend.Path; started_at = $backend.StartTime.ToUniversalTime().ToString("o") },
+            @{ name = "worker"; id = $worker.Id; path = $worker.Path; started_at = $worker.StartTime.ToUniversalTime().ToString("o") },
+            @{ name = "frontend"; id = $FrontendProcess.Id; path = $FrontendProcess.Path; started_at = $FrontendProcess.StartTime.ToUniversalTime().ToString("o") }
+        )
+    }
+    $state | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $statePath -Encoding UTF8
 }
-$state | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $statePath -Encoding UTF8
+Save-TraceGuardState -FrontendProcess $frontend
 
 function Wait-HttpOk {
     param([string]$Url, [int]$Seconds = 45)
@@ -95,11 +108,23 @@ if (-not (Wait-HttpOk -Url "http://127.0.0.1:$ApiPort/api/system/health")) {
     throw "FastAPI did not become healthy. See .runtime/backend.stderr.log."
 }
 $health = Invoke-RestMethod -Uri "http://127.0.0.1:$ApiPort/api/system/health" -TimeoutSec 5
-if ($health.data.graph.connected -ne $true) {
+if ($health.data.graph.configured -eq $true -and $health.data.graph.connected -ne $true) {
     throw "FastAPI is running, but Neo4j is not connected. Run scripts/check.ps1 for details."
 }
 if (-not (Wait-HttpOk -Url "http://127.0.0.1:$FrontendPort")) {
-    throw "Frontend did not become healthy. See .runtime/frontend.stderr.log."
+    if (-not $frontend.HasExited) {
+        Stop-Process -Id $frontend.Id -Force
+    }
+    Write-Warning "Vite did not become healthy. Falling back to the built static frontend proxy."
+    $dist = Join-Path $projectRoot "frontend\dist"
+    if (-not (Test-Path -LiteralPath (Join-Path $dist "index.html"))) {
+        throw "Frontend build output is missing. Run npm.cmd run build in frontend first."
+    }
+    $frontend = Start-Process -FilePath $python -ArgumentList @("scripts\static_frontend_proxy.py", "--host", "127.0.0.1", "--port", "$FrontendPort", "--api", "http://127.0.0.1:$ApiPort", "--root", "frontend\dist") -WorkingDirectory $projectRoot -WindowStyle Hidden -RedirectStandardOutput (Join-Path $runtimeDir "frontend.stdout.log") -RedirectStandardError (Join-Path $runtimeDir "frontend.stderr.log") -PassThru
+    Save-TraceGuardState -FrontendProcess $frontend
+    if (-not (Wait-HttpOk -Url "http://127.0.0.1:$FrontendPort" -Seconds 15)) {
+        throw "Frontend did not become healthy. See .runtime/frontend.stderr.log."
+    }
 }
 
 Write-Host "TraceGuard started"

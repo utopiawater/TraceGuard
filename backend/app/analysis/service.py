@@ -2,6 +2,7 @@ import csv
 import gzip
 import json
 import os
+import re
 import shutil
 import socket
 import struct
@@ -9,6 +10,7 @@ import subprocess
 import tarfile
 import zipfile
 from contextlib import contextmanager
+from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
@@ -361,7 +363,9 @@ class AnalysisTaskService:
             kind = SourceKind(item["source_kind"])
             dataset = item.get("dataset")
             try:
-                payloads = self._payloads(path, item["payload_format"], dataset)
+                payloads = list(self._payloads(path, item["payload_format"], dataset))
+                if item["payload_format"] == "pcap_ref" and not payloads:
+                    raise ValueError("PCAP parser produced 0 flows; unsupported link type or missing parser")
                 for index, payload in enumerate(payloads):
                     payload = dict(payload) if isinstance(payload, dict) else payload
                     record_dataset = payload.pop("_dataset", dataset) if isinstance(payload, dict) else dataset
@@ -391,8 +395,15 @@ class AnalysisTaskService:
             return list(self._pcap_payloads(path))
         if payload_format == "evtx":
             return list(self._evtx_payloads(path))
-        if payload_format in {"text", "xml"}:
-            return [path.read_text(encoding="utf-8", errors="replace")]
+        if payload_format == "xml":
+            return list(self._xml_events(path.read_text(encoding="utf-8", errors="replace")))
+        if payload_format == "text":
+            text = path.read_text(encoding="utf-8", errors="replace")
+            if dataset and dataset.startswith("web."):
+                return [line for line in text.splitlines() if line.strip()]
+            if dataset == "auditd.compound":
+                return list(self._auditd_compound_events(text))
+            return [text]
         if payload_format == "csv" and dataset and dataset.startswith("zeek."):
             return list(self._read_zeek(path))
         if payload_format == "csv":
@@ -426,6 +437,26 @@ class AnalysisTaskService:
         with path.open("r", encoding="utf-8", errors="replace", newline="") as handle:
             for row in csv.DictReader(handle):
                 yield dict(row)
+
+    def _xml_events(self, text: str) -> Iterable[str]:
+        matches = re.findall(r"<Event\b.*?</Event>", text, flags=re.S)
+        if matches:
+            yield from matches
+        elif text.strip():
+            yield text
+
+    def _auditd_compound_events(self, text: str) -> Iterable[str]:
+        groups: "OrderedDict[str, list[str]]" = OrderedDict()
+        for line in text.splitlines():
+            stripped = line.strip()
+            match = re.search(r"msg=audit\((\d+(?:\.\d+)?):(\d+)\):", stripped)
+            if not match:
+                continue
+            key = "%s:%s" % (match.group(1), match.group(2))
+            groups.setdefault(key, []).append(stripped)
+        for lines in groups.values():
+            if lines:
+                yield "\n".join(lines)
 
     def _pcap_payloads(self, path: Path) -> Iterable[dict]:
         zeek = shutil.which("zeek")
@@ -484,6 +515,7 @@ class AnalysisTaskService:
         if not endian:
             return
         nano = magic in {b"\x4d\x3c\xb2\xa1", b"\xa1\xb2\x3c\x4d"}
+        linktype = struct.unpack(endian + "IHHIIII", data[:24])[-1]
         offset = 24
         flows: Dict[tuple, dict] = {}
         index = 0
@@ -492,7 +524,7 @@ class AnalysisTaskService:
             offset += 16
             packet = data[offset:offset + incl_len]
             offset += incl_len
-            parsed = self._parse_ipv4_packet(packet)
+            parsed = self._parse_ipv4_packet(packet, linktype)
             if not parsed:
                 continue
             src, dst, proto, src_port, dst_port, length = parsed
@@ -506,13 +538,34 @@ class AnalysisTaskService:
         yield from flows.values()
 
     @staticmethod
-    def _parse_ipv4_packet(packet: bytes) -> Optional[tuple]:
-        if len(packet) < 34:
+    def _parse_ipv4_packet(packet: bytes, linktype: int = 1) -> Optional[tuple]:
+        if linktype == 1:
+            if len(packet) < 34:
+                return None
+            eth_type = struct.unpack("!H", packet[12:14])[0]
+            if eth_type != 0x0800:
+                return None
+            ip_start = 14
+        elif linktype == 276:
+            if len(packet) < 40:
+                return None
+            protocol = struct.unpack("!H", packet[0:2])[0]
+            if protocol != 0x0800:
+                return None
+            ip_start = 20
+        elif linktype == 113:
+            if len(packet) < 36:
+                return None
+            protocol = struct.unpack("!H", packet[14:16])[0]
+            if protocol != 0x0800:
+                return None
+            ip_start = 16
+        elif linktype == 101:
+            ip_start = 0
+        else:
             return None
-        eth_type = struct.unpack("!H", packet[12:14])[0]
-        if eth_type != 0x0800:
+        if len(packet) < ip_start + 20:
             return None
-        ip_start = 14
         version_ihl = packet[ip_start]
         if version_ihl >> 4 != 4:
             return None
@@ -667,8 +720,14 @@ class AnalysisTaskService:
     def _event_time(payload: Any) -> Optional[Any]:
         if isinstance(payload, dict):
             return payload.get("timestamp") or payload.get("ts") or payload.get("UtcTime") or payload.get("time")
+        if isinstance(payload, str):
+            audit_match = re.search(r"msg=audit\((\d+(?:\.\d+)?):\d+\):", payload)
+            if audit_match:
+                return audit_match.group(1)
+            web_match = re.search(r"\[([^\]]+)\]", payload)
+            if web_match and " HTTP/" in payload:
+                return web_match.group(1)
         if isinstance(payload, str) and "<Event" in payload:
-            import re
             match = re.search(r"<TimeCreated[^>]+SystemTime=['\"]([^'\"]+)['\"]", payload)
             return match.group(1) if match else None
         return None

@@ -85,11 +85,14 @@ function activeGroupsFor(pathname: string) {
 function runModeLabel(currentRun: { mode?: string; upload?: { filename?: string } } | null, healthMode?: string, healthError?: string | null) {
   if (healthError) return '离线'
   const mode = currentRun?.mode ?? healthMode
-  const source = currentRun?.upload?.filename ?? ''
-  if (mode === 'live' && source === 'demo_replay') return '实时回放'
   if (mode === 'live') return '实时'
   if (mode === 'snapshot') return '快照'
   return '回放'
+}
+
+function runDisplayName(run: { task_id: string; mode?: string; upload?: { filename?: string } }) {
+  if (run.mode === 'live' && run.upload?.filename === 'demo_replay') return '实时监测任务'
+  return run.upload?.filename ?? run.task_id
 }
 
 export function AppShell() {
@@ -160,7 +163,7 @@ export function AppShell() {
     </aside>
     {open && <button className="scrim" aria-label="关闭导航" onClick={() => setOpen(false)} />}
     <main>
-      <header className="topbar"><div className="case-context"><Activity size={16} /><span>运行模式</span><strong>{runModeLabel(currentRun, health?.mode, healthError)}</strong><span className="divider" /><label className="run-picker"><span>当前分析任务：</span><select value={currentRunId ?? ''} onChange={event=>setCurrentRunId(event.target.value || null)}><option value="">全部数据</option>{runs.map(run=><option key={run.task_id} value={run.task_id}>{run.upload?.filename ?? run.task_id}</option>)}</select></label>{currentRun&&<code>{currentRun.task_id}</code>}</div><form className="search-button global-search" onSubmit={submitSearch}><Search size={16} /><input value={searchText} onChange={event=>setSearchText(event.target.value)} placeholder="搜索事件、实体、证据或攻击链" aria-label="全局搜索" /><kbd>Enter</kbd></form></header>
+      <header className="topbar"><div className="case-context"><Activity size={16} /><span>运行模式</span><strong>{runModeLabel(currentRun, health?.mode, healthError)}</strong><span className="divider" /><label className="run-picker"><span>当前分析任务：</span><select value={currentRunId ?? ''} onChange={event=>setCurrentRunId(event.target.value || null)}><option value="">全部数据</option>{runs.map(run=><option key={run.task_id} value={run.task_id}>{runDisplayName(run)}</option>)}</select></label>{currentRun&&<code>{currentRun.task_id}</code>}</div><form className="search-button global-search" onSubmit={submitSearch}><Search size={16} /><input value={searchText} onChange={event=>setSearchText(event.target.value)} placeholder="搜索事件、实体、证据或攻击链" aria-label="全局搜索" /><kbd>Enter</kbd></form></header>
       <div className="content"><Outlet /></div>
     </main>
   </div>

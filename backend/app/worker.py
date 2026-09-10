@@ -32,8 +32,11 @@ class Worker:
         signal.signal(signal.SIGTERM, self.stop)
         LOGGER.info("worker started")
         while self.running:
-            if self.run_once() == 0:
-                time.sleep(interval_seconds)
+            started = time.monotonic()
+            self.run_once()
+            delay = max(interval_seconds - (time.monotonic() - started), 0.0)
+            if delay > 0:
+                time.sleep(delay)
 
 
 def main() -> None:
