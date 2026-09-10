@@ -207,6 +207,7 @@ C2 信息分三层：
 ## 9. 当前实现边界
 
 - 当前“分析任务”是证据包/replay 分析，不是真正实时在线监测。
+- 分析任务进度条已接入后端真实阶段回写，不由前端假设阶段；顶部 Current Run 下拉会与任务历史同步刷新。
 - “威胁归因”是候选相似性分析；证据不足时 `unable_to_attribute` 是正确结果。
 - 报告中心只展示已实际生成并持久化的 Markdown/HTML 报告；基础分析完成不等于报告已生成。
 - 搜索已覆盖事件、Detection、Evidence、AttackChain、Session、Agent、Report；结果跳转会保留当前 run，但部分列表页仍以分页表格承载定位。

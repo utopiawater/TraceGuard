@@ -122,3 +122,6 @@ The defense demo should use the global run picker as the case context. All major
 - AttackChain loads graph data by exact `chain_id`; Evidence is loaded by exact evidence ID.
 - The former graph page is named "安全实体视图" until a complete relation graph UI is implemented.
 - Analysis completion means base tracing is complete and Agent can be started; it does not mean Attribution or Report has already run.
+- The analysis task progress bar is backed by real backend stages. `AnalysisTaskService` writes `task.json` after parsing, and `AnalysisPipeline.run()` reports normalized events, entities/sessions, host/network projection, Detection, ATT&CK mapping, correlation, ChainBuilder, and ready-for-Agent stages through a progress callback.
+- The top global run picker and the Analysis Tasks page both read `/api/v1/analysis/tasks`. Uploading or starting a task triggers an immediate run-list refresh; the picker also refreshes on window focus and every 5 seconds while the app is open.
+- FastAPI startup should not block on a full historical Neo4j projection. Startup refreshes the in-memory graph view from SQLite; new analysis runs still project current facts to Neo4j through the normal pipeline.

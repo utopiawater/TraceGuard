@@ -107,6 +107,12 @@ def test_events_and_detections_are_paginated_latest_first_and_run_scoped(tmp_pat
     assert detections["data"][0]["detection_id"] == "det_run_B_19"
     assert all(item["run_id"] == "run_B" for item in detections["data"])
 
+    alerts = client.get("/api/alerts?run_id=run_B&limit=5").json()
+    assert alerts["meta"]["total"] == 20
+    assert len(alerts["data"]) == 5
+    assert alerts["data"][0]["detection_id"] == "det_run_B_19"
+    assert all(item["detection_id"].startswith("det_run_B_") for item in alerts["data"])
+
 
 def test_run_registry_includes_sqlite_runs_not_only_analysis_task_files(tmp_path):
     settings = _settings(tmp_path)

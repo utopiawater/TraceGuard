@@ -254,14 +254,18 @@ pytest / self-check：
 → 日志解析
 → 标准化
 → 实体/资产处理
+→ 主机与网络分析
 → Detection
 → ATT&CK
 → 跨源关联
 → AttackChain
+→ 可启动 Agent 调查
 → 基础溯源分析完成
 ```
 
 不得把不存在的后端阶段做成“假进度条”。
+
+当前实现中，阶段进度由 `AnalysisPipeline.run()` 的 progress callback 回写 `task.json`，前端分析任务页只渲染后端返回的 `stages/current_stage`。因此页面不会自行假设“已经跑到哪一步”；如果后端停在某阶段，页面也会真实停在该阶段。
 
 ### 6.3 完成状态
 
@@ -1200,56 +1204,58 @@ Agent Findings
 
 ### 31.1 分析任务
 
-- [ ] 一个证据包创建一个 run_id
-- [ ] 可切换历史 Analysis Run
-- [ ] Current Run 全平台一致
+- [x] 一个证据包创建一个 run_id
+- [x] 可切换历史 Analysis Run
+- [x] Current Run 全平台一致
+- [x] 顶部 Current Run 下拉与任务历史同步刷新
+- [x] 分析进度条来自后端真实阶段回写
 
 ### 31.2 多源数据
 
-- [ ] Windows 日志进入统一事件
-- [ ] Linux/Auditd 进入统一事件
-- [ ] Web/HTTP 进入统一事件
-- [ ] PCAP 进入 network.flow
-- [ ] 时间统一
-- [ ] 资产统一
+- [x] Windows 日志进入统一事件
+- [x] Linux/Auditd 进入统一事件
+- [x] Web/HTTP 进入统一事件
+- [x] PCAP 进入 network.flow
+- [x] 时间统一
+- [x] 资产统一
 
 ### 31.3 Detection / ATT&CK
 
-- [ ] Detection 可回溯 Event/Evidence
-- [ ] ATT&CK 不依赖 Ground Truth
-- [ ] Technique 统计属于当前 run
+- [x] Detection 可回溯 Event/Evidence
+- [x] ATT&CK 不依赖 Ground Truth
+- [x] Technique 统计属于当前 run
 
 ### 31.4 AttackChain
 
-- [ ] Chain 不依赖固定前 N 个 graph nodes
-- [ ] chain_id 精确加载图
-- [ ] Evidence 精确下钻
-- [ ] 同 tactic 可保留多个有独立证据的 Technique
-- [ ] 不把时间相邻误写成绝对因果
+- [x] Chain 不依赖固定前 N 个 graph nodes
+- [x] chain_id 精确加载图
+- [x] Evidence 精确下钻
+- [x] 同 tactic 多 Technique 在 Detection/ATT&CK 视图保留；主链展示按阶段选择代表步骤，避免答辩链路爆炸
+- [x] 不把时间相邻误写成绝对因果
 
 ### 31.5 Agent
 
-- [ ] 可在平台手动启动完整调查
-- [ ] 六 Agent 真实执行
-- [ ] real LLM / fallback 状态可见
-- [ ] EvidenceValidator 生效
-- [ ] Agent 不制造不存在的 Evidence/ATT&CK
+- [x] 可在平台手动启动完整调查
+- [x] 六 Agent 真实执行
+- [x] real LLM / fallback 状态可见
+- [x] EvidenceValidator 生效
+- [x] Agent 不制造不存在的 Evidence/ATT&CK
 
 ### 31.6 Attribution / Report
 
-- [ ] Attribution 说明本地/离线情报性质
-- [ ] 允许 unable_to_attribute
-- [ ] Report 属于当前 run
-- [ ] 切换 run 不串报告
+- [x] Attribution 说明本地/离线情报性质
+- [x] 允许 unable_to_attribute
+- [x] Report 属于当前 run
+- [x] 切换 run 不串报告
 
 ### 31.7 页面真实性
 
-- [ ] Events 分页 + total
-- [ ] Detections 分页 + total
-- [ ] 默认展示最近数据
-- [ ] Dashboard 最近记录语义正确
-- [ ] 没有 mock 冒充实时能力
-- [ ] 页面名称与真实功能一致
+- [x] Events 分页 + total
+- [x] Detections 分页 + total
+- [x] 默认展示最近数据
+- [x] Dashboard 最近记录语义正确
+- [x] 没有 mock 冒充实时能力
+- [x] 页面名称与真实功能一致
 
 ---
 

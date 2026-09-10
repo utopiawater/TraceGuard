@@ -27,6 +27,8 @@ class Settings(BaseModel):
     report_dir: Path = Path(os.getenv("TRACEGUARD_REPORT_DIR", "data/reports"))
     live_poll_interval_seconds: float = float(os.getenv("TRACEGUARD_LIVE_POLL_INTERVAL_SECONDS", "2"))
     live_micro_batch_size: int = int(os.getenv("TRACEGUARD_LIVE_MICRO_BATCH_SIZE", "50"))
+    demo_bundle_path: str = os.getenv("TRACEGUARD_DEMO_BUNDLE_PATH", "")
+    demo_replay_time_compression: float = float(os.getenv("TRACEGUARD_DEMO_REPLAY_TIME_COMPRESSION", "60"))
     live_replay_path: str = os.getenv("TRACEGUARD_LIVE_REPLAY_PATH", "")
     wazuh_jsonl_paths: str = os.getenv("TRACEGUARD_WAZUH_JSONL_PATHS", "")
     zeek_log_roots: str = os.getenv("TRACEGUARD_ZEEK_LOG_ROOTS", "")

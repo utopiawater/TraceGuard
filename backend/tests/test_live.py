@@ -6,6 +6,7 @@ from app.core.settings import Settings
 from app.graph import InMemoryGraphProjector
 from app.live import LiveRunService
 from app.main import create_app
+from app.api.routes.live import live_traffic
 from app.repositories import SQLiteRepository
 from app.worker import Worker
 
@@ -61,6 +62,35 @@ def test_worker_uses_checkpoint_after_restart_without_duplicate_replay(tmp_path)
     counts = repo.counts(run_id)
     assert Worker(repo, settings, graph).run_once() == 0
     assert repo.counts(run_id) == counts
+
+
+def test_consecutive_replay_live_runs_start_from_beginning(tmp_path):
+    settings = _settings(tmp_path, live_micro_batch_size=4)
+    repo = SQLiteRepository(settings.database_path)
+    graph = InMemoryGraphProjector()
+    service = LiveRunService(settings, repo, graph)
+
+    first = service.start(str(SCENARIO))["run_id"]
+    assert service.poll_once(first) == 4
+    second = service.start(str(SCENARIO))["run_id"]
+    assert second != first
+    assert service.poll_once(second) == 4
+
+    assert repo.counts(first)["raw_events"] == 4
+    assert repo.counts(second)["raw_events"] == 4
+
+
+def test_replay_clock_feeds_live_traffic_window(tmp_path):
+    settings = _settings(tmp_path, live_micro_batch_size=4)
+    repo = SQLiteRepository(settings.database_path)
+    service = LiveRunService(settings, repo, InMemoryGraphProjector())
+    run_id = service.start(str(SCENARIO))["run_id"]
+
+    assert service.poll_once(run_id) == 4
+    payload = live_traffic(run_id, repo=repo)["data"]
+
+    assert sum(payload["series"]["total"]) == 4
+    assert len(payload["recent_events"]) == 4
 
 
 def test_malformed_wazuh_line_and_offline_source_do_not_fail_live_run(tmp_path):

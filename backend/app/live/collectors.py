@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional
 
 from app.collectors.envelope import envelope_from_payload
 from app.collectors.replay_collector import ReplayCollector
@@ -22,11 +22,14 @@ class LivePollResult:
 
 class ReplayLiveCollector:
     source_type = "replay"
+    _records_cache: Dict[str, List[RawEventEnvelope]] = {}
 
-    def __init__(self, path: Path, batch_size: int = 10, source_id: str = "replay-live") -> None:
+    def __init__(self, path: Path, batch_size: int = 10, source_id: str = "replay-live", loader: Optional[Callable[[Path], List[RawEventEnvelope]]] = None, cache_key: Optional[str] = None) -> None:
         self.path = Path(path)
         self.batch_size = batch_size
         self.source_id = source_id
+        self.loader = loader
+        self.cache_key = cache_key
 
     def poll_new_events(self, cursor: Optional[dict] = None, max_records: Optional[int] = None) -> LivePollResult:
         if not self.path.exists():
@@ -41,9 +44,18 @@ class ReplayLiveCollector:
             return LivePollResult(cursor=cursor or {}, online=False, last_error=str(exc))
 
     def _records(self) -> List[RawEventEnvelope]:
-        if self.path.is_dir():
-            return load_scenario(self.path)
-        return ReplayCollector(self.path).collect()
+        if self.cache_key and self.cache_key in self._records_cache:
+            return self._records_cache[self.cache_key]
+        if self.loader:
+            records = self.loader(self.path)
+        elif self.path.is_dir():
+            records = load_scenario(self.path)
+        else:
+            records = ReplayCollector(self.path).collect()
+        records = sorted(records, key=lambda item: item.observed_time)
+        if self.cache_key:
+            self._records_cache[self.cache_key] = records
+        return records
 
 
 class _TailFileCollector:

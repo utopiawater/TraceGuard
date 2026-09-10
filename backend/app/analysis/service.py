@@ -111,6 +111,45 @@ class AnalysisTaskService:
         self._write_task(task)
         return task
 
+    def raw_envelopes_from_bundle(self, bundle_path: Path, task_id: str) -> List[RawEventEnvelope]:
+        source = Path(bundle_path)
+        if not source.exists():
+            raise FileNotFoundError(str(source))
+        suffix = self._suffix(source.name)
+        if suffix not in ALLOWED_SUFFIXES and not source.is_dir():
+            raise ValueError("unsupported replay bundle type: %s" % suffix)
+        task_dir = self.root / task_id
+        upload_dir = task_dir / "upload"
+        extract_dir = task_dir / "extracted"
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        extract_dir.mkdir(parents=True, exist_ok=True)
+        task = {
+            "task_id": task_id,
+            "status": "identified",
+            "current_stage": "identified",
+            "stages": self._stage_views("identified"),
+            "created_at": utc_now().isoformat(),
+            "updated_at": utc_now().isoformat(),
+            "upload": {"filename": source.name, "size": source.stat().st_size if source.is_file() else None, "stored_path": str(source)},
+            "identification": {"found": [], "unsupported": [], "warnings": []},
+            "result": None,
+            "ground_truth": {"files": [], "used_for_detection": False, "comparison": None},
+        }
+        if source.is_dir():
+            for path in source.rglob("*"):
+                if path.is_file():
+                    target = self._safe_join(extract_dir, str(path.relative_to(source)))
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(path, target)
+        else:
+            self._expand_input(source, extract_dir, task)
+        task["policy"] = self._load_manifest_policy(task_dir)
+        task["identification"] = self.identify(task_id)
+        task["ground_truth"]["files"] = [item["path"] for item in task["identification"]["found"] if item.get("evaluation_only")]
+        self._write_task(task)
+        with self._task_policy_environment(task.get("policy") or {}):
+            return self._raw_envelopes(task)
+
     def identify(self, task_id: str) -> dict:
         task_dir = self.root / task_id
         files = [path for path in (task_dir / "extracted").rglob("*") if path.is_file()]

@@ -25,9 +25,9 @@ def detection_detail(detection_id: str, repo: SQLiteRepository = Depends(reposit
 
 
 @router.get("/alerts")
-def alerts(repo: SQLiteRepository = Depends(repository)) -> dict:
-    values = [{"alert_id": item.detection_id, "detection_id": item.detection_id, "title": item.title, "severity": item.severity, "status": item.status, "evidence_count": len(item.evidence_ids)} for item in repo.list_detections(500)]
-    return response(values)
+def alerts(limit: int = Query(default=100, ge=1, le=500), offset: int = Query(default=0, ge=0), run_id: Optional[str] = None, repo: SQLiteRepository = Depends(repository)) -> dict:
+    values = [{"alert_id": item.detection_id, "detection_id": item.detection_id, "title": item.title, "severity": item.severity, "status": item.status, "evidence_count": len(item.evidence_ids)} for item in repo.list_detections(limit, run_id=run_id, offset=offset)]
+    return response(values, total=repo.count_table("detections", run_id=run_id))
 
 
 @router.get("/chains")

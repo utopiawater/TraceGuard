@@ -155,25 +155,28 @@ class SQLiteRepository:
             time_quality[key] += 1
         return {"sources": sources, "time_quality": time_quality}
 
-    def upsert_live_source(self, source_id: str, source_type: str, status: str, events_received_delta: int = 0, last_seen: Optional[str] = None, last_error: Optional[str] = None) -> None:
+    def upsert_live_source(self, run_id: str, source_id: str, source_type: str, status: str, events_received_delta: int = 0, last_seen: Optional[str] = None, last_error: Optional[str] = None) -> None:
         now = utc_now().isoformat()
         with self.connect() as connection:
-            existing = connection.execute("SELECT events_received,last_seen FROM live_sources WHERE source_id = ?", (source_id,)).fetchone()
+            existing = connection.execute("SELECT events_received,last_seen FROM live_sources WHERE run_id = ? AND source_id = ?", (run_id, source_id)).fetchone()
             current_count = int(existing["events_received"]) if existing else 0
             current_seen = existing["last_seen"] if existing else None
             connection.execute(
-                "INSERT OR REPLACE INTO live_sources(source_id,source_type,status,last_seen,events_received,last_error,updated_at) VALUES (?,?,?,?,?,?,?)",
-                (source_id, source_type, status, last_seen or current_seen, current_count + events_received_delta, last_error, now),
+                "INSERT OR REPLACE INTO live_sources(run_id,source_id,source_type,status,last_seen,events_received,last_error,updated_at) VALUES (?,?,?,?,?,?,?,?)",
+                (run_id, source_id, source_type, status, last_seen or current_seen, current_count + events_received_delta, last_error, now),
             )
 
-    def list_live_sources(self) -> List[dict]:
+    def list_live_sources(self, run_id: Optional[str] = None) -> List[dict]:
         with self.connect() as connection:
-            rows = connection.execute("SELECT * FROM live_sources ORDER BY source_id").fetchall()
+            if run_id:
+                rows = connection.execute("SELECT * FROM live_sources WHERE run_id = ? ORDER BY source_id", (run_id,)).fetchall()
+            else:
+                rows = connection.execute("SELECT * FROM live_sources ORDER BY updated_at DESC, source_id").fetchall()
         return [dict(row) for row in rows]
 
-    def get_checkpoint(self, source_id: str) -> dict:
+    def get_checkpoint(self, run_id: str, source_id: str) -> dict:
         with self.connect() as connection:
-            row = connection.execute("SELECT cursor_json FROM live_checkpoints WHERE source_id = ?", (source_id,)).fetchone()
+            row = connection.execute("SELECT cursor_json FROM live_checkpoints WHERE run_id = ? AND source_id = ?", (run_id, source_id)).fetchone()
         if not row:
             return {}
         try:
@@ -181,11 +184,11 @@ class SQLiteRepository:
         except json.JSONDecodeError:
             return {}
 
-    def put_checkpoint(self, source_id: str, source_type: str, cursor: dict) -> None:
+    def put_checkpoint(self, run_id: str, source_id: str, source_type: str, cursor: dict) -> None:
         with self.connect() as connection:
             connection.execute(
-                "INSERT OR REPLACE INTO live_checkpoints(source_id,source_type,cursor_json,updated_at) VALUES (?,?,?,?)",
-                (source_id, source_type, json.dumps(cursor, ensure_ascii=False), utc_now().isoformat()),
+                "INSERT OR REPLACE INTO live_checkpoints(run_id,source_id,source_type,cursor_json,updated_at) VALUES (?,?,?,?,?)",
+                (run_id, source_id, source_type, json.dumps(cursor, ensure_ascii=False), utc_now().isoformat()),
             )
 
     def list_runs(self, limit: int = 100) -> List[dict]:

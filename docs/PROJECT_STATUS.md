@@ -44,6 +44,8 @@ Collector / Replay / DARPA Dataset
 - 全局搜索已接入：顶部搜索框跳转 `/search?q=...`，后端 `/api/search` 只读查询 normalized events、detections、evidence、attack chains、sessions、Agent tasks/results 和 reports，不暴露 raw envelope、Ground Truth 或密钥类配置。
 - 数据源页面和 Agent source health 中的状态从“healthy”语义收窄为“ingested/已接入”，避免把历史事件存在误读为传感器实时健康。
 - 页面真实性收口已完成：Events / Detections / Sessions / Evidence / Chains / Network 支持 run scope、分页、total；AttackChain 页面按 `chain_id` 精确加载图与 Evidence；Host/Sources/ATT&CK/graph 投影不再先截断 500/5000/50000 条再聚合。
+- 分析任务进度条已接入后端主管道真实阶段回写：`AnalysisPipeline.run()` 在 normalized、entities、host_network、detections、attack、correlated、chains、ready_for_agent 阶段通过 progress callback 更新 `task.json`，前端只展示后端返回的真实阶段，不做假进度。
+- 顶部 Current Run 下拉与“分析任务”页面共享同一任务列表来源；上传/启动任务后会立即触发刷新，并在窗口聚焦和 5 秒轮询时同步历史 run，避免任务历史已有新 run 而顶部栏仍缺项。
 
 ## 3. DARPA TC E3 CADets 接入状态
 
@@ -117,6 +119,14 @@ py -3.13 scripts/replay_dataset.py --dataset datasets/darpa_tc_e3_cadets --data-
 - `.\.venv\Scripts\python.exe scripts\self_check.py`: passed，8 checks
 - `cd frontend; npm.cmd test`: passed，1 file / 2 tests
 - `cd frontend; npm.cmd run build`: passed
+
+2026-09-10 分析任务进度与顶部 run picker 修复后的定点验证：
+
+- `.\.venv\Scripts\python.exe -m pytest backend\tests\test_analysis_api.py backend\tests\test_page_truthfulness.py`: passed，8 passed / 2 warnings
+- `.\.venv\Scripts\python.exe scripts\self_check.py`: passed，8 checks
+- `cd frontend; npm.cmd test`: passed，1 file / 2 tests
+- `cd frontend; npm.cmd run build`: passed
+- `scripts/start.ps1` 可启动 FastAPI/frontend；`/api/system/health` 显示 `graph.configured=true`、`graph.connected=true`、`uri=bolt://127.0.0.1:7687`。
 
 2026-09-09 真实靶场泛化修复后的验证：
 
@@ -192,5 +202,5 @@ dry-run 不写数据库、不生成 Detection/AttackChain，只输出节点、�
 
 - Date: 2026-09-10
 - Branch: `main`
-- HEAD before this documentation/code closeout: `5736549`
-- Working tree note: 正常源码改动应只来自当前任务；提交时需显式白名单 staging，避免把 `datasets/darpa_tc_e3_cadets/` 中未跟踪的大型数据或 Evaluation-only JSON 误提交。
+- Latest pushed HEAD: `24634c0 fix: sync analysis task progress and run picker`
+- Working tree note: 当前仅 `datasets/darpa_tc_e3_cadets/` 中少量 Evaluation-only JSON 仍为未跟踪文件；提交时需显式白名单 staging，避免把大型数据或运行产物误提交。

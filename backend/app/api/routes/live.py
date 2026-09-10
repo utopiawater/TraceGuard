@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 from pathlib import Path
 from typing import Any, Optional
 
@@ -44,12 +45,87 @@ def live_service(request: Request, repo: SQLiteRepository = Depends(repository),
 
 @router.post("/v1/live/start")
 def start_live(payload: StartLiveRequest | None = None, service: LiveRunService = Depends(live_service)) -> dict:
-    return response(service.start(payload.replay_path if payload else None))
+    if payload and payload.replay_path:
+        raise HTTPException(status_code=400, detail="live replay path is controlled by server configuration")
+    return response(service.start())
 
 
 @router.get("/v1/live/status")
 def live_status(run_id: Optional[str] = None, service: LiveRunService = Depends(live_service)) -> dict:
     return response(service.status(run_id))
+
+
+@router.get("/v1/live/traffic")
+def live_traffic(
+    run_id: str,
+    window_seconds: int = 90,
+    bucket_seconds: int = 5,
+    repo: SQLiteRepository = Depends(repository),
+) -> dict:
+    if run_id == "__none__":
+        window = max(30, min(window_seconds, 180))
+        bucket = max(1, min(bucket_seconds, 30))
+        now = utc_now()
+        start = now - timedelta(seconds=window)
+        bucket_count = int(window / bucket) + 1
+        bucket_starts = [start + timedelta(seconds=index * bucket) for index in range(bucket_count)]
+        return response({
+            "run_id": None,
+            "window_seconds": window,
+            "bucket_seconds": bucket,
+            "categories": [item.strftime("%H:%M:%S") for item in bucket_starts],
+            "series": {"network": [0 for _ in bucket_starts], "endpoint": [0 for _ in bucket_starts], "total": [0 for _ in bucket_starts]},
+            "eps": 0,
+            "recent_events": [],
+        })
+    if not repo.get_run(run_id):
+        raise HTTPException(status_code=404, detail="live run not found")
+    window = max(30, min(window_seconds, 180))
+    bucket = max(1, min(bucket_seconds, 30))
+    now = utc_now()
+    start = now - timedelta(seconds=window)
+    bucket_count = int(window / bucket) + 1
+    bucket_starts = [start + timedelta(seconds=index * bucket) for index in range(bucket_count)]
+    network = [0 for _ in bucket_starts]
+    endpoint = [0 for _ in bucket_starts]
+    total = [0 for _ in bucket_starts]
+    events = repo.query_events(run_id=run_id, start_time=start.isoformat(), end_time=now.isoformat(), limit=2000)
+    for event in events:
+        offset = int((event.event_time - start).total_seconds() // bucket)
+        if offset < 0 or offset >= len(bucket_starts):
+            continue
+        is_network = bool(event.network) or event.action.startswith("network.") or event.source.kind.value == "zeek"
+        if is_network:
+            network[offset] += 1
+        else:
+            endpoint[offset] += 1
+        total[offset] += 1
+    recent_events = []
+    for event in repo.query_events(run_id=run_id, limit=12, descending=True):
+        src = event.network.src.ip if event.network and event.network.src else None
+        dst = event.network.dst.ip if event.network and event.network.dst else None
+        recent_events.append({
+            "event_id": event.event_id,
+            "time": event.event_time.isoformat(),
+            "source": event.source.kind.value,
+            "action": event.action,
+            "severity": event.severity,
+            "src": src or (event.host.display_name if event.host and event.host.display_name else event.host.entity_id if event.host else None),
+            "dst": dst or (event.object.ref.display_name if event.object.ref and event.object.ref.display_name else event.object.ref.entity_id if event.object.ref else None),
+            "message": event.message,
+        })
+    eps_window = max(min(window, 15), 1)
+    eps_start = now - timedelta(seconds=eps_window)
+    eps = sum(1 for event in events if event.event_time >= eps_start) / eps_window
+    return response({
+        "run_id": run_id,
+        "window_seconds": window,
+        "bucket_seconds": bucket,
+        "categories": [item.strftime("%H:%M:%S") for item in bucket_starts],
+        "series": {"network": network, "endpoint": endpoint, "total": total},
+        "eps": round(eps, 2),
+        "recent_events": recent_events,
+    })
 
 
 @router.post("/v1/live/poll")
