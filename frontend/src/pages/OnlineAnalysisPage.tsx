@@ -139,7 +139,7 @@ export function OnlineAnalysisPage() {
     <section className="analysis-workspace">
       <section className="analysis-history panel">
         <div className="panel-title"><h2>任务历史</h2><button type="button" className="secondary-action" onClick={()=>setTask(null)}>新建分析任务</button></div>
-        <div className="analysis-task-list">{(tasks ?? []).map(item => <button key={item.task_id} className={active?.task_id===item.task_id?'selected':''} onClick={()=>{setTask(item);setCurrentRunId(item.task_id)}}><strong>{item.upload?.filename ?? item.task_id}</strong><small>{analysisStatusName[item.status ?? ''] ?? item.status ?? 'unknown'} · {item.updated_at ? new Date(item.updated_at).toLocaleString('zh-CN') : item.task_id}</small></button>)}{!tasks?.length&&<span>暂无历史任务</span>}</div>
+        <div className="analysis-task-list">{(tasks ?? []).map(item => <button key={item.task_id} className={active?.task_id===item.task_id?'selected':''} onClick={()=>{setTask(item);setCurrentRunId(item.task_id)}}><TaskHistoryTitle value={item.upload?.filename ?? item.task_id} /><small>{analysisStatusName[item.status ?? ''] ?? item.status ?? 'unknown'} · {item.updated_at ? new Date(item.updated_at).toLocaleString('zh-CN') : item.task_id}</small></button>)}{!tasks?.length&&<span>暂无历史任务</span>}</div>
       </section>
       <label className={`upload-zone ${dragging ? 'dragging' : ''}`} onDragOver={event=>{event.preventDefault();setDragging(true)}} onDragLeave={()=>setDragging(false)} onDrop={onDrop}>
         <FileUp size={34} />
@@ -166,6 +166,12 @@ export function OnlineAnalysisPage() {
       </section>}
     </section>
   </>
+}
+
+function TaskHistoryTitle({value}:{value:string}) {
+  const shouldScroll = value.length > 22
+  if (!shouldScroll) return <strong className="task-history-title">{value}</strong>
+  return <strong className="task-history-title marquee" title={value}><span>{value}</span><span aria-hidden="true">{value}</span></strong>
 }
 
 function AnalysisResult({task, runScopedPath}:{task:ReadyAnalysisTask;runScopedPath:(path:string, extra?:Record<string,string|null|undefined>)=>string}) {

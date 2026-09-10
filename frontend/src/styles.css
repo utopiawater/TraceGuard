@@ -686,6 +686,42 @@ tbody tr:hover{
   box-shadow:none;
   transform:none;
 }
+
+.analysis-task-list button{
+  overflow:hidden;
+}
+.analysis-task-list .task-history-title{
+  max-width:100%;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+.analysis-task-list .task-history-title.marquee{
+  display:flex;
+  gap:28px;
+  width:100%;
+  text-overflow:clip;
+  mask-image:linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
+}
+.analysis-task-list .task-history-title.marquee span{
+  flex:0 0 auto;
+  min-width:100%;
+  animation:task-title-marquee 11s linear infinite;
+}
+.analysis-task-list button:hover .task-history-title.marquee span,
+.analysis-task-list button:focus-visible .task-history-title.marquee span{
+  animation-play-state:paused;
+}
+@keyframes task-title-marquee{
+  from{transform:translateX(0)}
+  to{transform:translateX(calc(-100% - 28px))}
+}
+@media (prefers-reduced-motion: reduce){
+  .analysis-task-list .task-history-title.marquee span{
+    animation:none;
+  }
+}
+
 .chain-card .chain-score{
   width:36px;
   height:36px;
@@ -695,20 +731,12 @@ tbody tr:hover{
   color:var(--tg-primary);
   display:grid;
   place-items:center;
-  align-content:center;
-  gap:1px;
   box-shadow:none;
 }
 .chain-card .chain-score strong{
-  font-size:12px;
+  font-size:13px;
   line-height:1;
   font-weight:700;
-}
-.chain-card .chain-score small{
-  margin:0;
-  font-size:8px;
-  line-height:1;
-  color:var(--tg-text-secondary);
 }
 .chain-card-main{
   display:grid;

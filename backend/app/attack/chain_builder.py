@@ -23,8 +23,7 @@ class DeterministicChainBuilder:
 
     def _build_group(self, run_id: str, eligible: List[DetectionResult]) -> AttackChain:
         eligible.sort(key=lambda item: (item.created_at, SEVERITY_ORDER[item.severity], item.detection_id))
-        selected: List[DetectionResult] = []
-        seen = set()
+        representatives: dict[str, DetectionResult] = {}
         for detection in eligible:
             if not detection.attack_mappings:
                 continue
@@ -32,14 +31,10 @@ class DeterministicChainBuilder:
             stage = TACTIC_STAGE.get(tactic, "execution")
             if stage not in MAINLINE:
                 continue
-            technique_id = detection.attack_mappings[0].subtechnique_id or detection.attack_mappings[0].technique_id
-            evidence_key = tuple(sorted(detection.evidence_ids))
-            key = (stage, technique_id, evidence_key)
-            if key in seen:
-                continue
-            seen.add(key)
-            selected.append(detection)
-        eligible = sorted(selected, key=lambda item: (item.created_at, SEVERITY_ORDER[item.severity], item.detection_id))
+            current = representatives.get(stage)
+            if current is None or self._stage_representative_key(detection) > self._stage_representative_key(current):
+                representatives[stage] = detection
+        eligible = sorted(representatives.values(), key=lambda item: (item.created_at, SEVERITY_ORDER[item.severity], item.detection_id))
         steps: List[ChainStep] = []
         for index, detection in enumerate(eligible):
             mapping = detection.attack_mappings[0]
