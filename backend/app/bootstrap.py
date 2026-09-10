@@ -5,11 +5,16 @@ from app.attack import DeterministicChainBuilder
 from app.core.settings import Settings
 from app.detection import DetectionEngine, RuleRegistry
 from app.detection.covert import DnsTunnelRule, HttpCovertChannelRule, IcmpTunnelRule
-from app.detection.rules import (ArchiveCollectedDataRule, CrossSourceNetworkRule, DataExfiltrationRule,
-    FlowNetworkServiceScanningRule, HttpC2CandidateRule, LateralMovementRule, MemoryTamperingRule,
-    NetworkServiceScanningRule, PrivilegeEscalationRule, RegistryPersistenceRule,
-    ServiceProcessExternalConnectionRule, RemoteInteractiveLogonRule, SensitiveFileCollectionRule,
-    SuspiciousHttpClientTransferRule, SuspiciousPowerShellRule, TempDirectoryExecutionRule, WebProbingRule)
+from app.detection.rules import (AnchoredPeerTrafficRule, ArchiveCollectedDataRule,
+    ArchiveTransferCorrelationRule, BeaconingSessionRule, CollectionArchiveCorrelationRule,
+    CrossSourceNetworkRule, DataExfiltrationRule, ExecutionCleanupRule,
+    FlowNetworkServiceScanningRule, ForkExecTempRule, HttpC2CandidateRule,
+    IngressToolTransferRule, LateralMovementRule, MemoryTamperingRule, NetworkServiceScanningRule,
+    PermissionThenExecutionRule, PrivilegeEscalationRule, RegistryPersistenceRule,
+    RemoteInteractiveLogonRule, SensitiveFileCollectionRule, SensitiveReadBurstRule, ServiceProcessExternalConnectionRule,
+    ServiceSpawnShellRule, SuspiciousFileStagingRule, SuspiciousHttpClientTransferRule,
+    SuspiciousPowerShellRule, SuspiciousServiceSessionRule, TempDirectoryExecutionRule,
+    TempExecNetworkRule, TempFileLifecycleRule, WebProbingRule)
 from app.entities import EntityResolver
 from app.graph import InMemoryGraphProjector, RuntimeGraphProjector
 from app.ingestion import IngestionService, RawArchive
@@ -37,6 +42,11 @@ def build_pipeline(settings: Settings, repository: Optional[SQLiteRepository] = 
         TempDirectoryExecutionRule(), ServiceProcessExternalConnectionRule(), NetworkServiceScanningRule(),
         FlowNetworkServiceScanningRule(), HttpC2CandidateRule(), WebProbingRule(),
         ArchiveCollectedDataRule(), SuspiciousHttpClientTransferRule(),
+        TempFileLifecycleRule(), PermissionThenExecutionRule(), ExecutionCleanupRule(),
+        ServiceSpawnShellRule(), TempExecNetworkRule(), SuspiciousServiceSessionRule(),
+        AnchoredPeerTrafficRule(), BeaconingSessionRule(), SensitiveReadBurstRule(),
+        CollectionArchiveCorrelationRule(), ArchiveTransferCorrelationRule(),
+        IngressToolTransferRule(), SuspiciousFileStagingRule(), ForkExecTempRule(),
         DnsTunnelRule(), HttpCovertChannelRule(), IcmpTunnelRule(),
     ])
     return AnalysisPipeline(

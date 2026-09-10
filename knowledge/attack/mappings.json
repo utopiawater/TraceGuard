@@ -16,7 +16,13 @@
     "T1046": {"technique_id": "T1046", "name": "Network Service Scanning", "tactic_ids": ["TA0007"]},
     "T1190": {"technique_id": "T1190", "name": "Exploit Public-Facing Application", "tactic_ids": ["TA0001"]},
     "T1560": {"technique_id": "T1560", "name": "Archive Collected Data", "tactic_ids": ["TA0009"]},
-    "T1560.001": {"technique_id": "T1560.001", "name": "Archive via Utility", "tactic_ids": ["TA0009"]}
+    "T1560.001": {"technique_id": "T1560.001", "name": "Archive via Utility", "tactic_ids": ["TA0009"]},
+    "T1105": {"technique_id": "T1105", "name": "Ingress Tool Transfer", "tactic_ids": ["TA0011"]},
+    "T1070": {"technique_id": "T1070", "name": "Indicator Removal", "tactic_ids": ["TA0005"]},
+    "T1070.004": {"technique_id": "T1070.004", "name": "File Deletion", "tactic_ids": ["TA0005"]},
+    "T1222": {"technique_id": "T1222", "name": "File and Directory Permissions Modification", "tactic_ids": ["TA0005"]},
+    "T1222.002": {"technique_id": "T1222.002", "name": "Linux and Mac File and Directory Permissions Modification", "tactic_ids": ["TA0005"]},
+    "T1059.004": {"technique_id": "T1059.004", "name": "Unix Shell", "tactic_ids": ["TA0002"]}
   },
   "groups": {
     "G0022": {
@@ -113,6 +119,20 @@
     "det.network.http_c2_candidate": [{"technique_id":"T1071","subtechnique_id":"T1071.001","tactic_ids":["TA0011"],"mapping_rule_id":"map.network.http_c2_candidate","attack_version":"19.2","confidence":0.68}],
     "det.web.probing": [],
     "det.host.archive_collected_data": [{"technique_id":"T1560","subtechnique_id":"T1560.001","tactic_ids":["TA0009"],"mapping_rule_id":"map.host.archive_collected_data","attack_version":"19.2","confidence":0.74}],
-    "det.host.suspicious_http_client_transfer": []
+    "det.host.suspicious_http_client_transfer": [],
+    "det.host.temp_file_lifecycle": [{"technique_id":"T1059","subtechnique_id":null,"tactic_ids":["TA0002"],"mapping_rule_id":"map.host.temp_file_lifecycle","attack_version":"19.2","confidence":0.76}],
+    "det.host.permission_then_execution": [{"technique_id":"T1222","subtechnique_id":"T1222.002","tactic_ids":["TA0005"],"mapping_rule_id":"map.host.permission_then_execution","attack_version":"19.2","confidence":0.72}],
+    "det.host.execution_cleanup": [{"technique_id":"T1070","subtechnique_id":"T1070.004","tactic_ids":["TA0005"],"mapping_rule_id":"map.host.execution_cleanup","attack_version":"19.2","confidence":0.78}],
+    "det.host.service_spawn_shell": [{"technique_id":"T1059","subtechnique_id":"T1059.004","tactic_ids":["TA0002"],"mapping_rule_id":"map.host.service_spawn_shell","attack_version":"19.2","confidence":0.86}],
+    "det.network.temp_exec_network": [{"technique_id":"T1071","subtechnique_id":"T1071.001","tactic_ids":["TA0011"],"mapping_rule_id":"map.network.temp_exec_network","attack_version":"19.2","confidence":0.78}],
+    "det.network.suspicious_service_session": [{"technique_id":"T1071","subtechnique_id":"T1071.001","tactic_ids":["TA0011"],"mapping_rule_id":"map.network.suspicious_service_session","attack_version":"19.2","confidence":0.8}],
+    "det.network.anchored_peer_traffic": [{"technique_id":"T1071","subtechnique_id":"T1071.001","tactic_ids":["TA0011"],"mapping_rule_id":"map.network.anchored_peer_traffic","attack_version":"19.2","confidence":0.7}],
+    "det.network.beaconing_session": [{"technique_id":"T1071","subtechnique_id":"T1071.001","tactic_ids":["TA0011"],"mapping_rule_id":"map.network.beaconing_session","attack_version":"19.2","confidence":0.74}],
+    "det.host.sensitive_read_burst": [{"technique_id":"T1005","subtechnique_id":null,"tactic_ids":["TA0009"],"mapping_rule_id":"map.host.sensitive_read_burst","attack_version":"19.2","confidence":0.82}],
+    "det.host.collection_archive_correlation": [{"technique_id":"T1560","subtechnique_id":"T1560.001","tactic_ids":["TA0009"],"mapping_rule_id":"map.host.collection_archive_correlation","attack_version":"19.2","confidence":0.8}],
+    "det.network.archive_transfer_correlation": [{"technique_id":"T1041","subtechnique_id":null,"tactic_ids":["TA0010"],"mapping_rule_id":"map.network.archive_transfer_correlation","attack_version":"19.2","confidence":0.84}],
+    "det.host.ingress_tool_transfer": [{"technique_id":"T1105","subtechnique_id":null,"tactic_ids":["TA0011"],"mapping_rule_id":"map.host.ingress_tool_transfer","attack_version":"19.2","confidence":0.82}],
+    "det.host.suspicious_file_staging": [{"technique_id":"T1105","subtechnique_id":null,"tactic_ids":["TA0011"],"mapping_rule_id":"map.host.suspicious_file_staging","attack_version":"19.2","confidence":0.66}],
+    "det.host.fork_exec_temp": [{"technique_id":"T1059","subtechnique_id":"T1059.004","tactic_ids":["TA0002"],"mapping_rule_id":"map.host.fork_exec_temp","attack_version":"19.2","confidence":0.72}]
   }
 }

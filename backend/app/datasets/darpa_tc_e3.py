@@ -310,7 +310,8 @@ def discover_dataset_reports(settings_data_dir: Path, project_root: Path) -> Lis
         try:
             payload = _load_json(path)
             payload["report_path"] = str(path)
+            payload["report_mtime"] = path.stat().st_mtime
             reports.append(payload)
         except (OSError, json.JSONDecodeError):
             continue
-    return sorted(reports, key=lambda item: (item.get("run_id") or "", item.get("runtime_seconds") or 0), reverse=True)
+    return sorted(reports, key=lambda item: (item.get("report_mtime") or 0, item.get("run_id") or ""), reverse=True)

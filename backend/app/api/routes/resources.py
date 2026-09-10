@@ -122,6 +122,7 @@ def datasets(request: Request) -> dict:
             "f1_reason": report.get("f1_reason"),
             "limitations": report.get("limitations", []),
             "report_path": report.get("report_path"),
+            "report_mtime": report.get("report_mtime"),
         })
     return response(rows)
 

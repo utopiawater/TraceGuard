@@ -1,12 +1,13 @@
 import ipaddress
 import json
+import math
 import ntpath
 import os
 import posixpath
 from pathlib import Path
-from collections import defaultdict
+from collections import Counter, defaultdict
 from fnmatch import fnmatch
-from typing import Dict, List
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from app.contracts import AttackMapping, DetectionResult, Evidence, Session, UnifiedSecurityEvent
 from app.core.ids import stable_id
@@ -22,6 +23,192 @@ def _command_line(event: UnifiedSecurityEvent) -> str:
     audit_execve = event.extensions.get("auditd", {}).get("execve", {})
     audit_args = [audit_execve[key] for key in sorted(audit_execve) if key.startswith("a") and key[1:].isdigit()]
     return str(sysmon_command or " ".join(audit_args) or event.message or "")
+
+
+SERVICE_PROCESS_NAMES = ("nginx", "httpd", "apache", "apache2", "w3wp", "iisexpress")
+SHELL_PROCESS_NAMES = ("sh", "bash", "dash", "zsh", "ksh", "csh", "tcsh", "cmd.exe", "powershell", "pwsh")
+SCRIPT_INTERPRETERS = ("python", "perl", "ruby", "php", "node", "osascript", "wscript", "cscript")
+ARCHIVE_TOOLS = ("tar", "zip", "gzip", "7z", "rar", "xz", "bzip2")
+TEMP_PREFIXES = ("/tmp/", "/var/tmp/", "/dev/shm/", "/run/shm/", "c:/windows/temp/", "c:/users/public/", "c:/temp/")
+
+
+def _host_id(event: UnifiedSecurityEvent) -> str:
+    return event.host.entity_id if event.host else ""
+
+
+def _process_id(event: UnifiedSecurityEvent) -> str:
+    return event.actor.process.entity_id if event.actor and event.actor.process else ""
+
+
+def _parent_id(event: UnifiedSecurityEvent) -> str:
+    return event.actor.parent_process.entity_id if event.actor and event.actor.parent_process else ""
+
+
+def _process_name(event: UnifiedSecurityEvent) -> str:
+    ref = event.actor.process if event.actor else None
+    return str((ref.display_name if ref else None) or (ref.attributes.get("image") if ref else None) or "").lower()
+
+
+def _parent_name(event: UnifiedSecurityEvent) -> str:
+    ref = event.actor.parent_process if event.actor else None
+    return str((ref.display_name if ref else None) or (ref.attributes.get("image") if ref else None) or "").lower()
+
+
+def _dataset_value(event: UnifiedSecurityEvent, key: str) -> Optional[Any]:
+    return event.extensions.get("dataset", {}).get(key)
+
+
+def _path(event: UnifiedSecurityEvent) -> str:
+    object_is_path = event.object.type in {"file", "registry"} if event.object else False
+    values = [
+        event.object.ref.attributes.get("normalized_path") if event.object.ref and object_is_path else None,
+        _dataset_value(event, "object_path"),
+        _dataset_value(event, "object2_path"),
+        event.object.ref.display_name if event.object.ref and object_is_path else None,
+        event.actor.process.attributes.get("image") if event.actor.process else None,
+        event.actor.process.display_name if event.actor.process else None,
+    ]
+    value = str(next((item for item in values if item), "")).replace("\\", "/").lower()
+    return posixpath.normpath(value) if value.startswith("/") else value
+
+
+def _is_temp_path(path: str) -> bool:
+    normalized = path.replace("\\", "/").lower()
+    return normalized.startswith(TEMP_PREFIXES) or normalized in {"/tmp", "/var/tmp", "/dev/shm"}
+
+
+def _basename(value: str) -> str:
+    return value.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1].lower()
+
+
+def _is_service_name(value: str) -> bool:
+    name = _basename(value)
+    return any(service == name or service in value for service in SERVICE_PROCESS_NAMES)
+
+
+def _is_shell_or_interpreter(value: str) -> bool:
+    name = _basename(value)
+    tokens = SHELL_PROCESS_NAMES + SCRIPT_INTERPRETERS
+    return any(name == token or name.startswith(f"{token}.") or f"/{token}" in value for token in tokens)
+
+
+def _is_archiver(event: UnifiedSecurityEvent) -> bool:
+    command = _command_line(event).lower()
+    image = _process_name(event)
+    name = _basename(image)
+    return any(name == tool or name.startswith(f"{tool}.") for tool in ARCHIVE_TOOLS) or any(token in command.split()[:3] for token in ARCHIVE_TOOLS)
+
+
+def _event_ids(items: Iterable[UnifiedSecurityEvent], limit: int = 80) -> List[str]:
+    seen = []
+    for item in sorted(items, key=lambda event: (event.event_time, event.event_id)):
+        if item.event_id not in seen:
+            seen.append(item.event_id)
+        if len(seen) >= limit:
+            break
+    return seen
+
+
+def _entity_ids(items: Iterable[UnifiedSecurityEvent]) -> List[str]:
+    values = set()
+    for item in items:
+        for ref in (item.host, item.actor.user, item.actor.process, item.actor.parent_process, item.object.ref):
+            if ref:
+                values.add(ref.entity_id)
+    return sorted(values)
+
+
+def _session_ids(items: Iterable[UnifiedSecurityEvent]) -> List[str]:
+    return sorted({item.network.session_id for item in items if item.network and item.network.session_id})
+
+
+def _detection(
+    run_id: str,
+    rule_id: str,
+    version: str,
+    title: str,
+    detector_type: str,
+    severity: str,
+    confidence: float,
+    items: List[UnifiedSecurityEvent],
+    evidence: List[Evidence],
+    feature_values: Dict[str, Any],
+    reason: str,
+    identity: Any,
+) -> DetectionResult:
+    ids = _event_ids(items)
+    return DetectionResult(
+        detection_id=stable_id("det", rule_id, version, identity, ids),
+        run_id=run_id,
+        rule_id=rule_id,
+        rule_version=version,
+        title=title,
+        detector_type=detector_type,
+        severity=severity,
+        confidence=confidence,
+        event_ids=ids,
+        entity_ids=_entity_ids(items),
+        session_ids=_session_ids(items),
+        feature_values=feature_values,
+        reason=reason,
+        attack_mappings=[],
+        evidence_ids=_evidence_for(ids, evidence),
+        created_at=max(item.event_time for item in items),
+    )
+
+
+def _within(later: UnifiedSecurityEvent, earlier: UnifiedSecurityEvent, seconds: int) -> bool:
+    return 0 <= (later.event_time - earlier.event_time).total_seconds() <= seconds
+
+
+def _process_related(left: UnifiedSecurityEvent, right: UnifiedSecurityEvent) -> bool:
+    left_ids = {_process_id(left), _parent_id(left)} - {""}
+    right_ids = {_process_id(right), _parent_id(right)} - {""}
+    return bool(left_ids & right_ids)
+
+
+def _remote_peer(event: UnifiedSecurityEvent) -> Optional[Tuple[str, Optional[int]]]:
+    if not event.network:
+        return None
+    host = _host_id(event)
+    endpoints = [event.network.src, event.network.dst]
+    for endpoint in endpoints:
+        if endpoint.host_id and endpoint.host_id == host:
+            continue
+        if endpoint.ip:
+            return (endpoint.ip, endpoint.port)
+    dst = event.network.dst
+    src = event.network.src
+    if event.network.direction in {"outbound", "unknown"} and dst.ip:
+        return (dst.ip, dst.port)
+    if src.ip:
+        return (src.ip, src.port)
+    return None
+
+
+def _canonical_peer_key(event: UnifiedSecurityEvent) -> Optional[str]:
+    peer = _remote_peer(event)
+    return "%s:%s" % peer if peer else None
+
+
+def _is_unexpected_peer(event: UnifiedSecurityEvent) -> bool:
+    if not event.network:
+        return False
+    peer = _remote_peer(event)
+    if not peer:
+        return False
+    local_ip = event.network.src.ip if event.network.direction in {"outbound", "unknown"} else event.network.dst.ip
+    return ServiceProcessExternalConnectionRule._is_unexpected_destination(local_ip, peer[0])
+
+
+def _is_outbound_anchor(event: UnifiedSecurityEvent) -> bool:
+    return bool(event.network and event.action in {"network.connect", "network.send"} and event.network.direction in {"outbound", "unknown"} and _is_unexpected_peer(event))
+
+
+def _network_bytes(event: UnifiedSecurityEvent) -> int:
+    if not event.network:
+        return 0
+    return int(event.network.bytes_sent or 0) + int(event.network.bytes_received or 0)
 
 
 class SuspiciousPowerShellRule:
@@ -573,6 +760,329 @@ class WebProbingRule:
                 evidence_ids=_evidence_for(event_ids, evidence),
                 created_at=max(item.event_time for item in items),
             ))
+        return results
+
+
+class TempFileLifecycleRule:
+    rule_id = "det.host.temp_file_lifecycle"
+    version = "1.0.0"
+
+    def evaluate(self, run_id, events, sessions, evidence):
+        grouped = defaultdict(list)
+        for event in events:
+            path = _path(event)
+            if path and event.action in {"file.open", "file.write", "file.modify", "process.start", "file.delete", "file.create"}:
+                grouped[(_host_id(event), path)].append(event)
+        results = []
+        for (host, path), items in grouped.items():
+            if not _is_temp_path(path):
+                continue
+            items.sort(key=lambda item: item.event_time)
+            for index, first in enumerate(items):
+                window = [item for item in items[index:] if 0 <= (item.event_time - first.event_time).total_seconds() <= 300]
+                has_write = any(item.action in {"file.open", "file.write", "file.create"} for item in window)
+                has_chmod = any(item.action == "file.modify" for item in window)
+                execs = [item for item in window if item.action == "process.start"]
+                deletes = [item for item in window if item.action == "file.delete"]
+                if execs and ((has_write and has_chmod) or has_write or deletes):
+                    feature = {"host": host, "path": path, "has_write_or_open": has_write, "has_permission_change": has_chmod, "has_execute": True, "has_delete": bool(deletes), "window_seconds": 300}
+                    results.append(_detection(run_id, self.rule_id, self.version, "临时文件落地执行生命周期", "correlation", "high", 0.86, window, evidence, feature, "同一主机临时路径在短时间内出现落地、权限变更、执行或清理的连续生命周期，单个文件操作未被单独判定。", (host, path, int(first.event_time.timestamp() // 300))))
+                    break
+        return results
+
+
+class PermissionThenExecutionRule:
+    rule_id = "det.host.permission_then_execution"
+    version = "1.0.0"
+
+    def evaluate(self, run_id, events, sessions, evidence):
+        results = []
+        by_path = defaultdict(list)
+        for event in events:
+            path = _path(event)
+            if path and event.action in {"file.modify", "process.start"}:
+                by_path[(_host_id(event), path)].append(event)
+        for key, items in by_path.items():
+            chmods = [item for item in items if item.action == "file.modify"]
+            execs = [item for item in items if item.action == "process.start"]
+            for chmod in sorted(chmods, key=lambda item: item.event_time):
+                matches = [item for item in execs if _within(item, chmod, 120)]
+                if matches:
+                    selected = [chmod, matches[0]]
+                    path = key[1]
+                    results.append(_detection(run_id, self.rule_id, self.version, "权限变更后执行文件", "correlation", "medium", 0.76, selected, evidence, {"path": path, "window_seconds": 120, "temp_path": _is_temp_path(path)}, "同一文件先发生权限修改，随后在有限时间窗内被执行；该规则只在 chmod 与执行可关联时触发。", key))
+                    break
+        return results
+
+
+class ExecutionCleanupRule:
+    rule_id = "det.host.execution_cleanup"
+    version = "1.0.0"
+
+    def evaluate(self, run_id, events, sessions, evidence):
+        results = []
+        by_path = defaultdict(list)
+        for event in events:
+            path = _path(event)
+            if path and _is_temp_path(path) and event.action in {"process.start", "file.delete"}:
+                by_path[(_host_id(event), path)].append(event)
+        for key, items in by_path.items():
+            execs = [item for item in items if item.action == "process.start"]
+            deletes = [item for item in items if item.action == "file.delete"]
+            for executed in sorted(execs, key=lambda item: item.event_time):
+                cleanup = [item for item in deletes if _within(item, executed, 120)]
+                if cleanup:
+                    selected = [executed, cleanup[0]]
+                    results.append(_detection(run_id, self.rule_id, self.version, "临时可执行文件运行后清理", "correlation", "medium", 0.78, selected, evidence, {"path": key[1], "window_seconds": 120}, "临时目录文件执行后很快被删除，符合执行后清理痕迹；普通删除不会单独触发。", key))
+                    break
+        return results
+
+
+class ServiceSpawnShellRule:
+    rule_id = "det.host.service_spawn_shell"
+    version = "1.0.0"
+
+    def evaluate(self, run_id, events, sessions, evidence):
+        results = []
+        for event in events:
+            if event.action != "process.start" or not event.actor.process or not event.actor.parent_process:
+                continue
+            parent = _parent_name(event)
+            child = _process_name(event)
+            path = _path(event)
+            if not _is_service_name(parent):
+                continue
+            if "sshd" in parent and _is_shell_or_interpreter(child):
+                continue
+            if _is_shell_or_interpreter(child) or _is_temp_path(path):
+                results.append(_detection(run_id, self.rule_id, self.version, "对外服务进程派生解释器", "correlation", "high", 0.88, [event], evidence, {"parent": parent, "child": child, "path": path}, "Web/IIS 等对外服务进程直接派生 shell、脚本解释器或临时目录可执行文件，父子进程谱系可验证。", (event.event_id, parent, child)))
+        return results
+
+
+class TempExecNetworkRule:
+    rule_id = "det.network.temp_exec_network"
+    version = "1.0.0"
+
+    def evaluate(self, run_id, events, sessions, evidence):
+        results = []
+        starts = [event for event in events if event.action == "process.start" and _is_temp_path(_path(event)) and _process_id(event)]
+        network = [event for event in events if event.network and event.action in {"network.connect", "network.send"} and _process_id(event)]
+        for start in starts:
+            related = [item for item in network if _process_related(start, item) and _within(item, start, 120) and _is_unexpected_peer(item)]
+            if related:
+                selected = [start] + related[:20]
+                results.append(_detection(run_id, self.rule_id, self.version, "临时可执行文件启动后外联", "correlation", "high", 0.86, selected, evidence, {"path": _path(start), "peers": sorted({_canonical_peer_key(item) for item in related if _canonical_peer_key(item)}), "window_seconds": 120}, "临时目录可执行文件启动后，同进程谱系出现主动跨网段或外部通信，形成执行到 C2 的关联证据。", (_host_id(start), _process_id(start), int(start.event_time.timestamp() // 120))))
+        return results
+
+
+class SuspiciousServiceSessionRule:
+    rule_id = "det.network.suspicious_service_session"
+    version = "1.0.0"
+
+    def evaluate(self, run_id, events, sessions, evidence):
+        groups = defaultdict(list)
+        for event in events:
+            if not event.network or not event.actor.process or event.action not in {"network.connect", "network.send", "network.receive"}:
+                continue
+            if not _is_service_name(_process_name(event)):
+                continue
+            peer = _canonical_peer_key(event)
+            if peer:
+                groups[(_host_id(event), _process_id(event), peer)].append(event)
+        results = []
+        for key, items in groups.items():
+            items.sort(key=lambda item: item.event_time)
+            anchors = [item for item in items if _is_outbound_anchor(item)]
+            if not anchors:
+                continue
+            for anchor in anchors:
+                window = [item for item in items if 0 <= abs((item.event_time - anchor.event_time).total_seconds()) <= 300]
+                if (max(item.event_time for item in window) - min(item.event_time for item in window)).total_seconds() < 1:
+                    continue
+                has_send = any(item.action in {"network.connect", "network.send"} for item in window)
+                has_receive = any(item.action == "network.receive" for item in window)
+                if has_send and has_receive:
+                    results.append(_detection(run_id, self.rule_id, self.version, "服务进程异常双向外联会话", "correlation", "high", 0.86, window[:80], evidence, {"peer": key[2], "event_count": len(window), "bytes": sum(_network_bytes(item) for item in window), "window_seconds": 300}, "对外服务进程先出现主动跨网段/外部连接锚点，并与同一 canonical peer 形成双向通信；普通入站 Web 请求响应不会触发。", key))
+                    break
+        return results
+
+
+class AnchoredPeerTrafficRule:
+    rule_id = "det.network.anchored_peer_traffic"
+    version = "1.0.0"
+
+    def evaluate(self, run_id, events, sessions, evidence):
+        anchors = []
+        for event in events:
+            if event.action == "process.start" and (_is_temp_path(_path(event)) or (_is_service_name(_parent_name(event)) and _is_shell_or_interpreter(_process_name(event)))):
+                anchors.append(event)
+            elif event.action.startswith("privilege.") and _process_id(event):
+                anchors.append(event)
+            elif event.network and _is_service_name(_process_name(event)) and _is_outbound_anchor(event):
+                anchors.append(event)
+        network = [event for event in events if event.network and event.action in {"network.connect", "network.send", "network.receive"}]
+        results = []
+        seen = set()
+        for anchor in anchors:
+            for peer in sorted({_canonical_peer_key(item) for item in network if _canonical_peer_key(item)}):
+                related = [item for item in network if _canonical_peer_key(item) == peer and abs((item.event_time - anchor.event_time).total_seconds()) <= 300 and (_process_related(anchor, item) or _host_id(anchor) == _host_id(item))]
+                if len(related) < 2 or not any(item.action in {"network.connect", "network.send"} for item in related):
+                    continue
+                identity = (_host_id(anchor), _process_id(anchor), peer, int(anchor.event_time.timestamp() // 300))
+                if identity in seen:
+                    continue
+                seen.add(identity)
+                selected = [anchor] + related[:60]
+                results.append(_detection(run_id, self.rule_id, self.version, "高风险进程锚定的 peer 通信", "correlation", "medium", 0.74, selected, evidence, {"anchor_action": anchor.action, "peer": peer, "supporting_network_events": len(related)}, "仅在临时执行、服务派生解释器、服务主动外联或权限变化等高风险锚点之后，聚合同 peer 的收发证据。", identity))
+        return results
+
+
+class BeaconingSessionRule:
+    rule_id = "det.network.beaconing_session"
+    version = "1.0.0"
+
+    def evaluate(self, run_id, events, sessions, evidence):
+        groups = defaultdict(list)
+        for event in events:
+            if event.network and event.action in {"network.connect", "network.send"} and _process_id(event) and _is_unexpected_peer(event):
+                peer = _canonical_peer_key(event)
+                if peer:
+                    groups[(_host_id(event), _process_id(event), peer)].append(event)
+        results = []
+        for key, items in groups.items():
+            items.sort(key=lambda item: item.event_time)
+            if len(items) < 5:
+                continue
+            intervals = [(items[index].event_time - items[index - 1].event_time).total_seconds() for index in range(1, len(items))]
+            positive = [value for value in intervals if value > 0]
+            if len(positive) < 4:
+                continue
+            avg = sum(positive) / len(positive)
+            if avg <= 0:
+                continue
+            variance = sum((value - avg) ** 2 for value in positive) / len(positive)
+            cv = math.sqrt(variance) / avg
+            if cv > 0.65:
+                continue
+            results.append(_detection(run_id, self.rule_id, self.version, "周期性主动通信候选", "statistical", "medium", 0.76, items[:80], evidence, {"peer": key[2], "request_count": len(items), "average_interval": round(avg, 3), "interval_cv": round(cv, 3), "bytes": sum(_network_bytes(item) for item in items)}, "同一主机/进程/peer 存在多次主动通信且间隔较稳定，并先满足外部或跨网段主动通信锚点，形成 C2 beacon 候选。", key))
+        return results
+
+
+class SensitiveReadBurstRule:
+    rule_id = "det.host.sensitive_read_burst"
+    version = "1.0.0"
+
+    def evaluate(self, run_id, events, sessions, evidence):
+        grouped = defaultdict(list)
+        for event in events:
+            path = _path(event)
+            if event.action == "file.read" and path and SensitiveFileCollectionRule._matches_sensitive_path(path):
+                grouped[(_host_id(event), _process_id(event))].append(event)
+        results = []
+        for key, items in grouped.items():
+            items.sort(key=lambda item: item.event_time)
+            for index, first in enumerate(items):
+                window = [item for item in items[index:] if _within(item, first, 120)]
+                paths = sorted({_path(item) for item in window})
+                if len(paths) >= 3:
+                    results.append(_detection(run_id, self.rule_id, self.version, "敏感路径集中读取", "threshold", "high", 0.84, window[:80], evidence, {"distinct_sensitive_paths": len(paths), "paths": paths[:20], "window_seconds": 120}, "同一进程在短时间内读取多个不同敏感路径，构成聚合 Collection 证据。", (key, int(first.event_time.timestamp() // 120))))
+                    break
+        return results
+
+
+class CollectionArchiveCorrelationRule:
+    rule_id = "det.host.collection_archive_correlation"
+    version = "1.0.0"
+
+    def evaluate(self, run_id, events, sessions, evidence):
+        reads = [event for event in events if event.action == "file.read" and SensitiveFileCollectionRule._matches_sensitive_path(_path(event))]
+        archives = [event for event in events if event.action == "process.start" and _is_archiver(event)]
+        results = []
+        for archive in archives:
+            related = [item for item in reads if _host_id(item) == _host_id(archive) and _within(archive, item, 300) and (_process_related(item, archive) or _process_id(item) == _process_id(archive))]
+            if related:
+                selected = related[:40] + [archive]
+                results.append(_detection(run_id, self.rule_id, self.version, "敏感读取后归档", "correlation", "high", 0.84, selected, evidence, {"archive_command": _command_line(archive), "sensitive_reads": len(related), "window_seconds": 300}, "敏感路径读取后，同主机/进程谱系出现 tar/zip/gzip 等归档行为，形成收集到打包的可解释关联。", (_host_id(archive), _process_id(archive), int(archive.event_time.timestamp() // 300))))
+        return results
+
+
+class ArchiveTransferCorrelationRule:
+    rule_id = "det.network.archive_transfer_correlation"
+    version = "1.0.0"
+
+    def evaluate(self, run_id, events, sessions, evidence):
+        reads = [event for event in events if event.action == "file.read" and SensitiveFileCollectionRule._matches_sensitive_path(_path(event))]
+        archives = [event for event in events if event.action == "process.start" and _is_archiver(event)]
+        transfers = [event for event in events if event.network and event.action in {"network.send", "network.connect", "network.file_transfer", "http.request"}]
+        results = []
+        for archive in archives:
+            prior_reads = [item for item in reads if _host_id(item) == _host_id(archive) and _within(archive, item, 300)]
+            for transfer in transfers:
+                if not _within(transfer, archive, 300) or _host_id(transfer) != _host_id(archive):
+                    continue
+                upload = (transfer.network.bytes_sent or 0) >= 50000 or transfer.action == "network.file_transfer" or (transfer.network.http and str(transfer.network.http.get("method") or "").upper() in {"POST", "PUT"})
+                if upload or (_is_unexpected_peer(transfer) and prior_reads):
+                    selected = prior_reads[:30] + [archive, transfer]
+                    results.append(_detection(run_id, self.rule_id, self.version, "归档后外传关联", "correlation", "critical", 0.86, selected, evidence, {"bytes_sent": transfer.network.bytes_sent, "peer": _canonical_peer_key(transfer), "archive_command": _command_line(archive)}, "敏感收集/归档后在有限窗口内出现大量出站传输、HTTP 上传或已确认异常 peer 会话，证据同时引用 collection、archive 与 network。", (_host_id(archive), _process_id(archive), _canonical_peer_key(transfer))))
+                    break
+        return results
+
+
+class IngressToolTransferRule:
+    rule_id = "det.host.ingress_tool_transfer"
+    version = "1.0.0"
+
+    def evaluate(self, run_id, events, sessions, evidence):
+        network_in = [event for event in events if event.network and event.action in {"network.receive", "network.connect"}]
+        writes = [event for event in events if event.action in {"file.open", "file.write", "file.create"} and _is_temp_path(_path(event))]
+        starts = [event for event in events if event.action == "process.start" and _is_temp_path(_path(event))]
+        results = []
+        for write in writes:
+            inbound = [item for item in network_in if _host_id(item) == _host_id(write) and _within(write, item, 120) and (_process_related(item, write) or _process_id(item) == _process_id(write))]
+            executed = [item for item in starts if _host_id(item) == _host_id(write) and _path(item) == _path(write) and _within(item, write, 180)]
+            if inbound and executed:
+                selected = inbound[:10] + [write, executed[0]]
+                results.append(_detection(run_id, self.rule_id, self.version, "外部接收后工具落地执行", "correlation", "high", 0.84, selected, evidence, {"path": _path(write), "network_events": len(inbound), "window_seconds": 180}, "外部网络接收/连接后，同主机进程谱系将文件写入临时目录并执行，满足工具传入的落地和执行链。", (_host_id(write), _path(write), int(write.event_time.timestamp() // 180))))
+        return results
+
+
+class SuspiciousFileStagingRule:
+    rule_id = "det.host.suspicious_file_staging"
+    version = "1.0.0"
+
+    def evaluate(self, run_id, events, sessions, evidence):
+        grouped = defaultdict(list)
+        for event in events:
+            path = _path(event)
+            if path and _is_temp_path(path) and event.action in {"file.create", "file.open", "file.write", "file.modify", "process.start"}:
+                grouped[(_host_id(event), path)].append(event)
+        results = []
+        for key, items in grouped.items():
+            items.sort(key=lambda item: item.event_time)
+            prep = [item for item in items if item.action in {"file.create", "file.open", "file.write", "file.modify"}]
+            if len({item.action for item in prep}) < 2:
+                continue
+            exec_or_parent = [item for item in items if item.action == "process.start" or _is_service_name(_parent_name(item))]
+            if exec_or_parent:
+                selected = prep[:30] + exec_or_parent[:3]
+                results.append(_detection(run_id, self.rule_id, self.version, "临时文件连续暂存准备", "correlation", "medium", 0.76, selected, evidence, {"path": key[1], "preparation_actions": sorted({item.action for item in prep}), "has_execute_or_high_risk_parent": True}, "临时目录同一文件出现连续 create/open/write/chmod 准备动作，并随后执行或与高风险服务父进程相关，单个 open/write 不触发。", key))
+        return results
+
+
+class ForkExecTempRule:
+    rule_id = "det.host.fork_exec_temp"
+    version = "1.0.0"
+
+    def evaluate(self, run_id, events, sessions, evidence):
+        forks = [event for event in events if event.action == "process.start" and _dataset_value(event, "original_action") in {"aue_fork", "aue_vfork"}]
+        execs = [event for event in events if event.action == "process.start" and _dataset_value(event, "original_action") == "aue_execve"]
+        results = []
+        for fork in forks:
+            matches = [item for item in execs if _host_id(item) == _host_id(fork) and _within(item, fork, 30) and (_process_related(fork, item) or _parent_id(item) == _process_id(fork))]
+            risky = [item for item in matches if _is_temp_path(_path(item)) or _is_shell_or_interpreter(_process_name(item)) or _is_service_name(_parent_name(item))]
+            if risky:
+                selected = [fork, risky[0]]
+                results.append(_detection(run_id, self.rule_id, self.version, "fork 后异常 exec", "correlation", "medium", 0.74, selected, evidence, {"path": _path(risky[0]), "child": _process_name(risky[0]), "window_seconds": 30}, "fork/vfork 后短时间内 exec 临时目录文件、解释器或服务进程子链；普通 fork/exec 不触发。", (_host_id(fork), _process_id(fork), risky[0].event_id)))
         return results
 
 
