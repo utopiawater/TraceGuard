@@ -26,11 +26,15 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.state.settings = active
     app.state.repository = SQLiteRepository(active.database_path)
     app.state.graph = RuntimeGraphProjector(active.neo4j_uri, active.neo4j_user, active.neo4j_password, active.neo4j_enabled, Path(__file__).parents[2] / "deploy" / "neo4j" / "schema.cypher")
-    app.state.graph.project(EntityResolver().resolve(
+    startup_projection = EntityResolver().resolve(
         app.state.repository.all_events(),
         app.state.repository.all_sessions(),
         app.state.repository.all_detections(),
-    ))
+    )
+    if hasattr(app.state.graph, "memory"):
+        app.state.graph.memory.project(startup_projection)
+    else:
+        app.state.graph.project(startup_projection)
     app.state.investigation_service = InvestigationService(app.state.repository, app.state.graph, active)
     app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"], allow_credentials=False, allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["*"])
     app.include_router(api_router)

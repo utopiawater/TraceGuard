@@ -43,9 +43,9 @@ STAGES = [
     ("entities", "实体提取"),
     ("host_network", "主机与网络分析"),
     ("detections", "检测规则"),
+    ("attack", "ATT&CK 映射"),
     ("correlated", "跨源事件关联"),
     ("chains", "攻击链构建"),
-    ("attack", "ATT&CK 映射"),
     ("ready_for_agent", "可启动 Agent 调查"),
     ("completed", "基础分析完成"),
 ]
@@ -159,7 +159,7 @@ class AnalysisTaskService:
             self._write_task(task)
             pipeline = build_pipeline(self.settings, self.repository, self.graph)
             with self._task_policy_environment(task.get("policy") or {}):
-                result = pipeline.run(task_id, raws, mode="replay")
+                result = pipeline.run(task_id, raws, mode="replay", progress=lambda stage: self._update_stage(task_id, stage))
             task["status"] = "completed"
             task["current_stage"] = "completed"
             task["stages"] = self._stage_views("completed")
@@ -219,6 +219,16 @@ class AnalysisTaskService:
         path = self.root / task["task_id"] / "task.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(task, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def _update_stage(self, task_id: str, stage: str) -> None:
+        task = self.get(task_id)
+        if task.get("status") not in {"running", "identified", "uploaded"}:
+            return
+        task["status"] = "running"
+        task["current_stage"] = stage
+        task["stages"] = self._stage_views(stage)
+        task["updated_at"] = utc_now().isoformat()
+        self._write_task(task)
 
     def _expand_input(self, path: Path, target_dir: Path, task: dict, depth: int = 0) -> None:
         if depth > 4:

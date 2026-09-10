@@ -108,6 +108,7 @@ export function OnlineAnalysisPage() {
       const response = await apiUpload<AnalysisTask>('/api/v1/analysis/upload', file)
       setTask(response.data)
       setCurrentRunId(response.data.task_id)
+      window.dispatchEvent(new Event('traceguard:runs-updated'))
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '上传失败')
     } finally {
@@ -122,6 +123,7 @@ export function OnlineAnalysisPage() {
       const response = await apiPost<AnalysisTask>(`/api/v1/analysis/tasks/${active.task_id}/start`)
       setTask(response.data)
       setCurrentRunId(response.data.task_id, response.data.status === 'completed')
+      window.dispatchEvent(new Event('traceguard:runs-updated'))
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '启动分析失败')
     } finally {

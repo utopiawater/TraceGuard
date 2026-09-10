@@ -1,4 +1,4 @@
-from typing import List
+from typing import Callable, List, Optional
 
 from pydantic import Field
 
@@ -41,23 +41,35 @@ class AnalysisPipeline:
         self.detection = detection
         self.chains = chains
 
-    def run(self, run_id: str, raws: List[RawEventEnvelope], mode: str = "replay") -> PipelineResult:
+    def run(self, run_id: str, raws: List[RawEventEnvelope], mode: str = "replay", progress: Optional[Callable[[str], None]] = None) -> PipelineResult:
+        def advance(stage: str) -> None:
+            if progress:
+                progress(stage)
+
         self.repository.start_run(run_id, mode, {"raw_ids": [item.raw_id for item in raws]}, {"pipeline": self.version})
         accepted = [item for item in (self.ingestion.accept(raw) for raw in raws) if item is not None]
+        advance("normalized")
         events = [event for raw in accepted for event in self.normalizers.normalize(raw)]
         evidence = [self._event_evidence(event) for event in events]
+        advance("entities")
         sessions = self.sessionizer.build(events)
         self.repository.append_events(run_id, events)
         self.repository.put_evidence(run_id, evidence)
         self.repository.put_sessions(run_id, sessions)
         facts = self.resolver.resolve(events, sessions)
+        advance("host_network")
         self.graph.project(facts)
+        advance("detections")
         detections = self.detection.evaluate(run_id, events, sessions, evidence)
         self.repository.put_detections(detections)
+        advance("attack")
         projected = self.resolver.resolve(events, sessions, detections)
         self.graph.project(projected)
+        advance("correlated")
+        advance("chains")
         chains = self.chains.build(run_id, detections)
         self.repository.put_chains(chains)
+        advance("ready_for_agent")
         self.repository.complete_run(run_id)
         return PipelineResult(run_id=run_id, accepted_raw=len(accepted), events=events, sessions=sessions, evidence=evidence, detections=detections, chains=chains, graph_entities=projected.entities, graph_relations=projected.relations)
 
@@ -71,4 +83,3 @@ class AnalysisPipeline:
             producer=event.provenance.parser_name, producer_version=event.provenance.parser_version,
             integrity_sha256=sha256_text(event.model_dump_json()), reliability="direct", supports=[], contradicts=[],
         )
-

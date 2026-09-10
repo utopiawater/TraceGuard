@@ -1,6 +1,6 @@
-import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { useApi } from '../hooks/useApi'
+import { apiGet } from '../api/client'
 
 export interface AnalysisRunSummary {
   task_id: string
@@ -27,8 +27,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
   const location = useLocation()
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const { data } = useApi<AnalysisRunSummary[]>('/api/v1/analysis/tasks')
-  const runs = data ?? []
+  const [runs, setRuns] = useState<AnalysisRunSummary[]>([])
   const initialStoredRun = useRef(localStorage.getItem(STORAGE_KEY))
   const shouldAutoSelectRun = useRef(initialStoredRun.current == null)
   const [currentRunId, setCurrentRunIdState] = useState<string | null>(() => {
@@ -36,6 +35,24 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
     return stored === ALL_RUNS ? null : stored
   })
   const urlRunId = params.get('run_id')
+
+  const refreshRuns = useCallback(() => {
+    apiGet<AnalysisRunSummary[]>('/api/v1/analysis/tasks')
+      .then(response => setRuns(response.data ?? []))
+      .catch(() => undefined)
+  }, [])
+
+  useEffect(() => {
+    refreshRuns()
+    const id = window.setInterval(refreshRuns, 5000)
+    window.addEventListener('focus', refreshRuns)
+    window.addEventListener('traceguard:runs-updated', refreshRuns)
+    return () => {
+      window.clearInterval(id)
+      window.removeEventListener('focus', refreshRuns)
+      window.removeEventListener('traceguard:runs-updated', refreshRuns)
+    }
+  }, [refreshRuns])
 
   useEffect(() => {
     if (urlRunId && urlRunId !== currentRunId) setCurrentRunIdState(urlRunId)
@@ -78,13 +95,18 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
     navigate(suffix ? `${base}?${suffix}` : base)
   }
 
+  const visibleRuns = useMemo(() => {
+    if (!currentRunId || runs.some(item => item.task_id === currentRunId)) return runs
+    return [{ task_id: currentRunId, upload: { filename: currentRunId } }, ...runs]
+  }, [currentRunId, runs])
+
   const value = useMemo<AnalysisContextValue>(() => ({
     currentRunId,
-    currentRun: runs.find(item => item.task_id === currentRunId) ?? null,
-    runs,
+    currentRun: visibleRuns.find(item => item.task_id === currentRunId) ?? null,
+    runs: visibleRuns,
     setCurrentRunId,
     runScopedPath,
-  }), [currentRunId, runs, location.pathname, location.search])
+  }), [currentRunId, visibleRuns, location.pathname, location.search])
 
   return <AnalysisContext.Provider value={value}>{children}</AnalysisContext.Provider>
 }

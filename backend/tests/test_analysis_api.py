@@ -1,6 +1,7 @@
 from pathlib import Path
 import json
 import zipfile
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
@@ -86,3 +87,33 @@ def test_analysis_manifest_policy_scopes_time_asset_aliases_and_excludes_gt(tmp_
     assert {event["host"]["display_name"] for event in events if event.get("host")} == {"n4-web"}
     sample_event = next(event for event in events if event["source"]["dataset"] == "sample_attack_dataset")
     assert sample_event["event_time"] == "2026-09-09T07:56:22Z"
+
+
+def test_analysis_start_persists_pipeline_progress_stages(tmp_path, monkeypatch):
+    source = Path(__file__).parents[1] / "fixtures" / "scenarios" / "powershell_cross_source" / "sysmon_1_process_create.xml"
+    archive = tmp_path / "sysmon.zip"
+    with zipfile.ZipFile(archive, "w") as handle:
+        handle.write(source, "sysmon_1_process_create.xml")
+    app = create_app(Settings(data_dir=tmp_path, database_path=tmp_path / "db.sqlite", raw_archive_dir=tmp_path / "raw", report_dir=tmp_path / "reports", neo4j_enabled=False))
+    client = TestClient(app)
+    uploaded = client.post("/api/v1/analysis/upload", files={"file": ("sysmon.zip", archive.read_bytes(), "application/zip")})
+    assert uploaded.status_code == 200
+    task_id = uploaded.json()["data"]["task_id"]
+    observed = []
+
+    class FakePipeline:
+        def run(self, run_id, raws, mode="replay", progress=None):
+            assert run_id == task_id
+            assert progress is not None
+            for stage in ("detections", "attack", "correlated", "chains", "ready_for_agent"):
+                progress(stage)
+                task = json.loads((tmp_path / "analysis_tasks" / task_id / "task.json").read_text(encoding="utf-8"))
+                observed.append(task["current_stage"])
+                assert task["stages"][next(index for index, item in enumerate(task["stages"]) if item["key"] == stage)]["status"] == "running"
+            return SimpleNamespace(accepted_raw=len(raws), events=[], detections=[], graph_entities=[], chains=[])
+
+    monkeypatch.setattr("app.analysis.service.build_pipeline", lambda settings, repository, graph: FakePipeline())
+    started = client.post("/api/v1/analysis/tasks/%s/start" % task_id)
+    assert started.status_code == 200
+    assert observed == ["detections", "attack", "correlated", "chains", "ready_for_agent"]
+    assert started.json()["data"]["current_stage"] == "completed"
