@@ -23,7 +23,7 @@ from app.core.time import parse_timestamp, utc_now
 from app.repositories import SQLiteRepository
 
 
-ALLOWED_SUFFIXES = {".log", ".json", ".jsonl", ".csv", ".pcap", ".evtx", ".zip", ".tar.gz"}
+ALLOWED_SUFFIXES = {".log", ".json", ".jsonl", ".csv", ".pcap", ".pcapng", ".evtx", ".zip", ".tar.gz"}
 GROUND_TRUTH_MARKERS = (
     "attack_steps.md",
     "attack_timeline.json",
@@ -283,7 +283,7 @@ class AnalysisTaskService:
         lowered = path.name.lower()
         if any(marker in lowered for marker in GROUND_TRUTH_MARKERS):
             return RecognizedFile(path, "Ground Truth", None, None, "json" if lowered.endswith(".json") else "text", reason="evaluation-only file", evaluation_only=True)
-        if lowered.endswith(".pcap"):
+        if lowered.endswith((".pcap", ".pcapng")):
             parser = shutil.which("zeek") or shutil.which("tshark")
             return RecognizedFile(path, "PCAP", SourceKind.zeek, "pcap", "pcap_ref", 1, "pcap capture", parser_status="ready" if parser else "python_fallback")
         if lowered.endswith(".evtx"):
@@ -321,23 +321,30 @@ class AnalysisTaskService:
             path = task_dir / item["path"]
             kind = SourceKind(item["source_kind"])
             dataset = item.get("dataset")
-            for index, payload in enumerate(self._payloads(path, item["payload_format"], dataset)):
-                payload = dict(payload) if isinstance(payload, dict) else payload
-                record_dataset = payload.pop("_dataset", dataset) if isinstance(payload, dict) else dataset
-                record_kind = self._windows_kind_from_xml(payload, kind)
-                event_time_raw = self._event_time(payload)
-                default_tz = (task.get("policy") or {}).get("default_timezone")
-                observed = parse_timestamp(event_time_raw, default_tz) if event_time_raw is not None else utc_now()
-                record_id = "%s:%s:%d" % (task["task_id"], path.name, index)
-                aliases = (task.get("policy") or {}).get("asset_aliases")
-                path_hint = self._host_hint_from_path(path, aliases if isinstance(aliases, dict) else None)
-                host_hint = self._host_hint(payload)
-                if host_hint and host_hint.lower() in {"localhost", "."}:
-                    host_hint = path_hint or host_hint
-                source = SourceDescriptor(kind=record_kind, product=self._product(record_kind, record_dataset), dataset=record_dataset, sensor_id=self._sensor_id(path, payload, record_kind), host_hint=host_hint or path_hint, source_record_id=record_id)
-                payload_format = "json" if item["payload_format"] == "pcap_ref" else "xml" if item["payload_format"] == "evtx" else item["payload_format"]
-                labels = {"analysis_task_id": task["task_id"], "uploaded_file": task["upload"]["filename"], **(task.get("policy") or {})}
-                raws.append(envelope_from_payload(source, payload, payload_format, event_time_raw, "analysis://%s/%s#%d" % (task["task_id"], item["path"], index), observed, labels))
+            try:
+                payloads = self._payloads(path, item["payload_format"], dataset)
+                for index, payload in enumerate(payloads):
+                    payload = dict(payload) if isinstance(payload, dict) else payload
+                    record_dataset = payload.pop("_dataset", dataset) if isinstance(payload, dict) else dataset
+                    record_kind = self._windows_kind_from_xml(payload, kind)
+                    event_time_raw = self._event_time(payload)
+                    default_tz = (task.get("policy") or {}).get("default_timezone")
+                    observed = parse_timestamp(event_time_raw, default_tz) if event_time_raw is not None else utc_now()
+                    record_id = "%s:%s:%d" % (task["task_id"], path.name, index)
+                    aliases = (task.get("policy") or {}).get("asset_aliases")
+                    path_hint = self._host_hint_from_path(path, aliases if isinstance(aliases, dict) else None)
+                    host_hint = self._host_hint(payload)
+                    if host_hint and host_hint.lower() in {"localhost", "."}:
+                        host_hint = path_hint or host_hint
+                    source = SourceDescriptor(kind=record_kind, product=self._product(record_kind, record_dataset), dataset=record_dataset, sensor_id=self._sensor_id(path, payload, record_kind), host_hint=host_hint or path_hint, source_record_id=record_id)
+                    payload_format = "json" if item["payload_format"] == "pcap_ref" else "xml" if item["payload_format"] == "evtx" else item["payload_format"]
+                    labels = {"analysis_task_id": task["task_id"], "uploaded_file": task["upload"]["filename"], **(task.get("policy") or {})}
+                    raws.append(envelope_from_payload(source, payload, payload_format, event_time_raw, "analysis://%s/%s#%d" % (task["task_id"], item["path"], index), observed, labels))
+            except Exception as exc:
+                record_id = "%s:%s:parse-error" % (task["task_id"], path.name)
+                labels = {"analysis_task_id": task["task_id"], "uploaded_file": task["upload"]["filename"], "parse_error": str(exc), **(task.get("policy") or {})}
+                source = SourceDescriptor(kind=kind, product=self._product(kind, dataset), dataset=dataset, sensor_id="%s:%s" % (kind.value, path.stem.lower()), host_hint=self._host_hint_from_path(path), source_record_id=record_id)
+                raws.append(envelope_from_payload(source, self._sample(path, 65536), "text", None, "analysis://%s/%s#parse-error" % (task["task_id"], item["path"]), utc_now(), labels))
         return raws
 
     def _payloads(self, path: Path, payload_format: str, dataset: Optional[str]) -> Iterable[Any]:
@@ -352,7 +359,15 @@ class AnalysisTaskService:
         if payload_format == "csv":
             return list(self._read_csv(path))
         if path.suffix.lower() == ".jsonl":
-            return [json.loads(line) for line in path.read_text(encoding="utf-8", errors="replace").splitlines() if line.strip()]
+            rows = []
+            for index, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines()):
+                if not line.strip():
+                    continue
+                try:
+                    rows.append(json.loads(line))
+                except json.JSONDecodeError:
+                    rows.append({"_parse_error": "invalid jsonl line", "line_number": index + 1, "raw": line})
+            return rows
         loaded = json.loads(path.read_text(encoding="utf-8"))
         return loaded if isinstance(loaded, list) else [loaded]
 

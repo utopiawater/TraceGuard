@@ -23,7 +23,7 @@ class WindowsSecurityAdapter:
             raise AdapterError("Windows Security adapter expects exported Event XML")
         parsed = parse_windows_event(raw.payload)
         event_number, data = parsed["event_id"], parsed["data"]
-        mapping = {4624: ("auth.logon", "success"), 4625: ("auth.logon", "failure"), 4634: ("auth.logoff", "success"), 4647: ("auth.logoff", "success"), 4672: ("auth.privilege_context", "success"), 4663: ("file.access", "success")}
+        mapping = {4624: ("auth.logon", "success"), 4625: ("auth.logon", "failure"), 4634: ("auth.logoff", "success"), 4647: ("auth.logoff", "success"), 4672: ("auth.privilege_assigned", "success"), 4663: ("file.access", "success")}
         if event_number not in mapping:
             return []
         action, outcome = mapping[event_number]

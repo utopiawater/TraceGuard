@@ -6,6 +6,7 @@ import { AgentsPage } from './pages/AgentsPage'
 import { AttributionPage } from './pages/AttributionPage'
 import { ReportsPage } from './pages/ReportsPage'
 import { OnlineAnalysisPage } from './pages/OnlineAnalysisPage'
+import { LiveMonitoringPage } from './pages/LiveMonitoringPage'
 import { AnalysisProvider } from './context/AnalysisContext'
 
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then(module => ({ default: module.DashboardPage })))
@@ -19,6 +20,7 @@ const router=createBrowserRouter([{path:'/',element:<AnalysisProvider><AppShell/
   {path:'events',element:<EventsPage/>},{path:'agents',element:<AgentsPage/>},{path:'attack',element:<AttackPage/>},
   {path:'attribution',element:<AttributionPage/>},{path:'sources',element:<SourcesPage/>},{path:'datasets',element:<DatasetsPage/>},{path:'reports',element:<ReportsPage/>},
   {path:'analysis',element:<OnlineAnalysisPage/>},{path:'search',element:<SearchPage/>},
+  {path:'live',element:<LiveMonitoringPage/>},
 ]}])
 
 export default function App(){return <RouterProvider router={router}/>}

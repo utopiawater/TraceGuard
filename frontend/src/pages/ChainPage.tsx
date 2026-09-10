@@ -176,8 +176,17 @@ function applyNodeFocus(cy: cytoscape.Core, node: cytoscape.NodeSingular) {
 
 export function ChainPage() {
   const [params] = useSearchParams()
-  const { currentRunId: runId } = useAnalysis()
-  const scoped = runId ? `run_id=${encodeURIComponent(runId)}` : ''
+  const { currentRunId: runId, currentRun } = useAnalysis()
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    if (currentRun?.mode !== 'live' || currentRun.status !== 'running') return
+    const id = window.setInterval(() => setTick(value => value + 1), 2000)
+    return () => window.clearInterval(id)
+  }, [currentRun?.mode, currentRun?.status])
+  const scopedParams = new URLSearchParams()
+  if (runId) scopedParams.set('run_id', runId)
+  if (currentRun?.mode === 'live' && currentRun.status === 'running') scopedParams.set('t', String(tick))
+  const scoped = scopedParams.toString()
   const { data: chains, error, loading } = useApi<Chain[]>(`/api/chains${scoped ? `?${scoped}` : ''}`)
   const { data: attack } = useApi<AttackTechnique[]>(`/api/attack${scoped ? `?${scoped}` : ''}`)
   const requested = params.get('chain')

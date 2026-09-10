@@ -8,15 +8,22 @@ import { useEffect, useState } from 'react'
 type Row = Record<string, unknown>
 
 export function ResourcePage({ title, description, endpoint, columns }: { title: string; description: string; endpoint: string; columns: [string,string][] }) {
-  const { currentRunId: runId } = useAnalysis()
+  const { currentRunId: runId, currentRun } = useAnalysis()
   const [page, setPage] = useState(0)
+  const [tick, setTick] = useState(0)
   const pageSize = 100
   useEffect(() => setPage(0), [runId, endpoint])
+  useEffect(() => {
+    if (currentRun?.mode !== 'live' || currentRun.status !== 'running') return
+    const id = window.setInterval(() => setTick(value => value + 1), 2000)
+    return () => window.clearInterval(id)
+  }, [currentRun?.mode, currentRun?.status])
   const params = new URLSearchParams(endpoint.includes('?') ? endpoint.split('?')[1] : '')
   params.set('limit', String(pageSize))
   params.set('offset', String(page * pageSize))
   if (runId) params.set('run_id', runId)
   else params.delete('run_id')
+  if (currentRun?.mode === 'live' && currentRun.status === 'running') params.set('t', String(tick))
   const scopedEndpoint = `${endpoint.split('?')[0]}?${params.toString()}`
   const { data, meta, loading, error } = useApi<Row[]>(scopedEndpoint)
   const total = meta?.total ?? data?.length ?? 0

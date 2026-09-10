@@ -111,11 +111,12 @@ def test_analysis_python_pcap_fallback_produces_network_flow(tmp_path, monkeypat
     assert event.action == "network.flow"
 
 
-def test_windows_4672_is_privileged_context_not_privilege_escalation():
+def test_windows_4672_is_privilege_assigned_detection_candidate():
     xml = "<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System><Provider Name='Microsoft-Windows-Security-Auditing'/><EventID>4672</EventID><TimeCreated SystemTime='2026-09-09T08:00:00Z'/><EventRecordID>1</EventRecordID><Channel>Security</Channel><Computer>N7-Office</Computer></System><EventData><Data Name='TargetUserName'>alice</Data><Data Name='TargetLogonId'>0x1</Data><Data Name='PrivilegeList'>SeDebugPrivilege</Data></EventData></Event>"
     event = WindowsSecurityAdapter().normalize(_raw("windows_security", "windows.security.xml", xml, "2026-09-09T08:00:00Z"))[0]
-    assert event.action == "auth.privilege_context"
-    assert PrivilegeEscalationRule().evaluate("run", [event], [], _evidence([event])) == []
+    assert event.action == "auth.privilege_assigned"
+    detections = PrivilegeEscalationRule().evaluate("run", [event], [], _evidence([event]))
+    assert detections[0].rule_id == "det.host.privilege_escalation"
 
 
 def test_c2_candidate_requires_request_semantics_not_dataset_name():

@@ -40,7 +40,7 @@ class WazuhAdapter:
             10: ("memory.process_access", "memory"), 11: ("file.create", "file"), 12: ("registry.create", "registry"),
             13: ("registry.modify", "registry"), 14: ("registry.rename", "registry"), 23: ("file.delete", "file"),
             25: ("memory.process_tamper", "memory"), 4624: ("auth.logon", "user"), 4625: ("auth.logon", "user"),
-            4672: ("auth.privilege_context", "user"),
+            4672: ("auth.privilege_assigned", "user"),
         }
         action, object_type = mapping.get(event_number, ("security.alert", "other"))
         timestamp = payload.get("timestamp") or system.get("systemTime") or raw.event_time_raw or raw.observed_time.isoformat()

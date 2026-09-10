@@ -1,6 +1,6 @@
 from typing import List
 
-from app.contracts import AttackChain, ChainStep, DetectionResult
+from app.contracts import AttackChain, AttackMapping, ChainStep, DetectionResult
 from app.contracts.analytics import ChainStepRef, StepPredecessor
 from app.core.ids import stable_id
 from app.correlation import CorrelationEngine
@@ -9,6 +9,10 @@ from app.correlation import CorrelationEngine
 TACTIC_STAGE = {"TA0001": "initial_access", "TA0002": "execution", "TA0003": "persistence", "TA0004": "privilege_escalation", "TA0006": "credential_access", "TA0007": "discovery", "TA0008": "lateral_movement", "TA0009": "collection", "TA0011": "command_and_control", "TA0010": "exfiltration"}
 MAINLINE = {"initial_access", "execution", "command_and_control", "lateral_movement", "privilege_escalation", "collection", "exfiltration"}
 SEVERITY_ORDER = {"informational": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
+INFERRED_MAPPINGS = {
+    "det.auth.remote_interactive_logon": AttackMapping(technique_id="T1078", tactic_ids=["TA0001"], mapping_rule_id="chain.infer.valid_accounts", attack_version="19.2", confidence=0.62),
+    "det.host.privilege_escalation": AttackMapping(technique_id="T1068", tactic_ids=["TA0004"], mapping_rule_id="chain.infer.privilege_escalation", attack_version="19.2", confidence=0.68),
+}
 
 
 class DeterministicChainBuilder:
@@ -19,15 +23,22 @@ class DeterministicChainBuilder:
 
     def build(self, run_id: str, detections: List[DetectionResult]) -> List[AttackChain]:
         groups = self.correlation.groups(detections)
-        return [self._build_group(run_id, group) for group in groups if any(item.attack_mappings and TACTIC_STAGE.get(item.attack_mappings[0].tactic_ids[0]) in MAINLINE for item in group)]
+        chains = []
+        for group in groups:
+            if any(self._mapping(item) and TACTIC_STAGE.get(self._mapping(item).tactic_ids[0]) in MAINLINE for item in group):
+                chain = self._build_group(run_id, group)
+                if chain.steps:
+                    chains.append(chain)
+        return chains
 
     def _build_group(self, run_id: str, eligible: List[DetectionResult]) -> AttackChain:
         eligible.sort(key=lambda item: (item.created_at, SEVERITY_ORDER[item.severity], item.detection_id))
         representatives: dict[str, DetectionResult] = {}
         for detection in eligible:
-            if not detection.attack_mappings:
+            mapping = self._mapping(detection)
+            if not mapping:
                 continue
-            tactic = detection.attack_mappings[0].tactic_ids[0]
+            tactic = mapping.tactic_ids[0]
             stage = TACTIC_STAGE.get(tactic, "execution")
             if stage not in MAINLINE:
                 continue
@@ -37,7 +48,9 @@ class DeterministicChainBuilder:
         eligible = sorted(representatives.values(), key=lambda item: (item.created_at, SEVERITY_ORDER[item.severity], item.detection_id))
         steps: List[ChainStep] = []
         for index, detection in enumerate(eligible):
-            mapping = detection.attack_mappings[0]
+            mapping = self._mapping(detection)
+            if not mapping:
+                continue
             tactic_id = mapping.tactic_ids[0]
             technique_id = mapping.subtechnique_id or mapping.technique_id
             step_id = stable_id("step", detection.detection_id, technique_id)
@@ -79,7 +92,9 @@ class DeterministicChainBuilder:
 
     @staticmethod
     def _stage_representative_key(detection: DetectionResult) -> tuple:
-        mapping = detection.attack_mappings[0]
+        mapping = DeterministicChainBuilder._mapping(detection)
+        if not mapping:
+            return (0, 0.0, 0, 0.0)
         return (
             SEVERITY_ORDER[detection.severity],
             round(detection.confidence * mapping.confidence, 6),
@@ -102,3 +117,9 @@ class DeterministicChainBuilder:
         if shared:
             return "shared_entity_relation"
         return "temporal_relation"
+
+    @staticmethod
+    def _mapping(detection: DetectionResult) -> AttackMapping | None:
+        if detection.attack_mappings:
+            return detection.attack_mappings[0]
+        return INFERRED_MAPPINGS.get(detection.rule_id)

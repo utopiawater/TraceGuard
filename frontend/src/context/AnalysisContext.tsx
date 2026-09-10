@@ -5,6 +5,7 @@ import { apiGet } from '../api/client'
 export interface AnalysisRunSummary {
   task_id: string
   status?: string
+  mode?: 'live' | 'replay' | 'snapshot'
   created_at?: string
   updated_at?: string
   upload?: { filename?: string; size?: number }

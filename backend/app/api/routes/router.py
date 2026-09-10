@@ -9,7 +9,8 @@ from .search import router as search_router
 from .system import router as system_router
 from .agents import router as agents_router
 from .analysis import router as analysis_router
+from .live import router as live_router
 
 api_router = APIRouter(prefix="/api")
-for router in (analysis_router, dashboard_router, collectors_router, events_router, investigation_router, resources_router, search_router, agents_router, system_router):
+for router in (analysis_router, live_router, dashboard_router, collectors_router, events_router, investigation_router, resources_router, search_router, agents_router, system_router):
     api_router.include_router(router)

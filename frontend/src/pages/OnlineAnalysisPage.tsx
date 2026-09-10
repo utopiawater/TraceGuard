@@ -146,8 +146,8 @@ export function OnlineAnalysisPage() {
       <label className={`upload-zone ${dragging ? 'dragging' : ''}`} onDragOver={event=>{event.preventDefault();setDragging(true)}} onDragLeave={()=>setDragging(false)} onDrop={onDrop}>
         <FileUp size={34} />
         <strong>拖拽文件到这里，或点击选择</strong>
-        <span>.log .json .jsonl .csv .pcap .zip .tar.gz</span>
-        <input type="file" accept=".log,.json,.jsonl,.csv,.pcap,.zip,.gz" onChange={event=>{const file=event.target.files?.[0]; if(file) void upload(file)}} disabled={busy} />
+        <span>.log .json .jsonl .csv .pcap .pcapng .evtx .zip .tar.gz</span>
+        <input type="file" accept=".log,.json,.jsonl,.csv,.pcap,.pcapng,.evtx,.zip,.gz" onChange={event=>{const file=event.target.files?.[0]; if(file) void upload(file)}} disabled={busy} />
       </label>
       {error && <EmptyState kind="error" title="分析任务失败" detail={error} />}
       {active && <section className="analysis-panel">

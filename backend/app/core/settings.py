@@ -25,6 +25,11 @@ class Settings(BaseModel):
     llm_model: str = os.getenv("LLM_MODEL", "")
     llm_timeout_seconds: float = float(os.getenv("LLM_TIMEOUT_SECONDS", "180"))
     report_dir: Path = Path(os.getenv("TRACEGUARD_REPORT_DIR", "data/reports"))
+    live_poll_interval_seconds: float = float(os.getenv("TRACEGUARD_LIVE_POLL_INTERVAL_SECONDS", "2"))
+    live_micro_batch_size: int = int(os.getenv("TRACEGUARD_LIVE_MICRO_BATCH_SIZE", "50"))
+    live_replay_path: str = os.getenv("TRACEGUARD_LIVE_REPLAY_PATH", "")
+    wazuh_jsonl_paths: str = os.getenv("TRACEGUARD_WAZUH_JSONL_PATHS", "")
+    zeek_log_roots: str = os.getenv("TRACEGUARD_ZEEK_LOG_ROOTS", "")
 
     def ensure_directories(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)

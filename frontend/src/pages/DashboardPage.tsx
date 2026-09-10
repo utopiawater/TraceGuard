@@ -3,7 +3,7 @@ import { BarChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import { AlertTriangle, CheckCircle2, GitBranch, RadioTower } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { EmptyState } from '../components/EmptyState'
 import { PageHeader } from '../components/PageHeader'
 import { useAnalysis } from '../context/AnalysisContext'
@@ -24,8 +24,17 @@ const sourceStatusClass = (status: string) => {
 }
 
 export function DashboardPage() {
-  const { currentRunId: runId, runScopedPath } = useAnalysis()
-  const { data, error, loading } = useApi<Dashboard>(`/api/dashboard${runId ? `?run_id=${encodeURIComponent(runId)}` : ''}`)
+  const { currentRunId: runId, currentRun, runScopedPath } = useAnalysis()
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    if (currentRun?.mode !== 'live' || currentRun.status !== 'running') return
+    const id = window.setInterval(() => setTick(value => value + 1), 2000)
+    return () => window.clearInterval(id)
+  }, [currentRun?.mode, currentRun?.status])
+  const dashboardQuery = new URLSearchParams()
+  if (runId) dashboardQuery.set('run_id', runId)
+  if (currentRun?.mode === 'live' && currentRun.status === 'running') dashboardQuery.set('t', String(tick))
+  const { data, error, loading } = useApi<Dashboard>(`/api/dashboard${dashboardQuery.toString() ? `?${dashboardQuery.toString()}` : ''}`)
   const { data: health } = useApi<SystemHealth>('/api/system/health')
   const chartRef = useRef<HTMLDivElement>(null)
   const pipelineStatusText = health?.mode === 'replay'

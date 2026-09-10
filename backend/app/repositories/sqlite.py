@@ -54,9 +54,55 @@ class SQLiteRepository:
                 (run_id, mode, "running", json.dumps(manifest, ensure_ascii=False), json.dumps(versions, ensure_ascii=False), utc_now().isoformat()),
             )
 
+    def ensure_run(self, run_id: str, mode: str, manifest: Any, versions: Any, status: str = "running") -> None:
+        with self.connect() as connection:
+            exists = connection.execute("SELECT 1 FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+            if exists:
+                connection.execute("UPDATE runs SET status=?, completed_at=NULL WHERE run_id=?", (status, run_id))
+                return
+            connection.execute(
+                "INSERT INTO runs(run_id,mode,status,input_manifest_json,versions_json,started_at) VALUES (?,?,?,?,?,?)",
+                (run_id, mode, status, json.dumps(manifest, ensure_ascii=False), json.dumps(versions, ensure_ascii=False), utc_now().isoformat()),
+            )
+
+    def get_run(self, run_id: str) -> Optional[dict]:
+        with self.connect() as connection:
+            row = connection.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+        return dict(row) if row else None
+
+    def current_live_run(self) -> Optional[dict]:
+        with self.connect() as connection:
+            row = connection.execute("SELECT * FROM runs WHERE mode='live' AND status='running' ORDER BY started_at DESC LIMIT 1").fetchone()
+        return dict(row) if row else None
+
+    def append_run_raw_ids(self, run_id: str, raw_ids: Sequence[str]) -> None:
+        if not raw_ids:
+            return
+        with self.connect() as connection:
+            row = connection.execute("SELECT input_manifest_json FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+            if not row:
+                return
+            try:
+                manifest = json.loads(row[0] or "{}")
+            except (TypeError, json.JSONDecodeError):
+                manifest = {}
+            merged = list(dict.fromkeys(list(manifest.get("raw_ids", [])) + list(raw_ids)))
+            manifest["raw_ids"] = merged
+            connection.execute("UPDATE runs SET input_manifest_json=? WHERE run_id=?", (json.dumps(manifest, ensure_ascii=False), run_id))
+
     def complete_run(self, run_id: str, status: str = "completed") -> None:
         with self.connect() as connection:
             connection.execute("UPDATE runs SET status=?, completed_at=? WHERE run_id=?", (status, utc_now().isoformat(), run_id))
+
+    def put_dead_letter(self, raw_id: Optional[str], stage: str, error_code: str, error_message: str, payload_ref: Optional[str] = None) -> None:
+        from app.core.ids import stable_id
+
+        created = utc_now().isoformat()
+        with self.connect() as connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO dead_letters(dead_letter_id,raw_id,stage,error_code,error_message,payload_ref,created_at) VALUES (?,?,?,?,?,?,?)",
+                (stable_id("dead", raw_id, stage, error_code, error_message), raw_id, stage, error_code, error_message, payload_ref, created),
+            )
 
     def put_raw(self, raw: RawEventEnvelope) -> bool:
         with self.connect() as connection:
@@ -109,6 +155,39 @@ class SQLiteRepository:
             time_quality[key] += 1
         return {"sources": sources, "time_quality": time_quality}
 
+    def upsert_live_source(self, source_id: str, source_type: str, status: str, events_received_delta: int = 0, last_seen: Optional[str] = None, last_error: Optional[str] = None) -> None:
+        now = utc_now().isoformat()
+        with self.connect() as connection:
+            existing = connection.execute("SELECT events_received,last_seen FROM live_sources WHERE source_id = ?", (source_id,)).fetchone()
+            current_count = int(existing["events_received"]) if existing else 0
+            current_seen = existing["last_seen"] if existing else None
+            connection.execute(
+                "INSERT OR REPLACE INTO live_sources(source_id,source_type,status,last_seen,events_received,last_error,updated_at) VALUES (?,?,?,?,?,?,?)",
+                (source_id, source_type, status, last_seen or current_seen, current_count + events_received_delta, last_error, now),
+            )
+
+    def list_live_sources(self) -> List[dict]:
+        with self.connect() as connection:
+            rows = connection.execute("SELECT * FROM live_sources ORDER BY source_id").fetchall()
+        return [dict(row) for row in rows]
+
+    def get_checkpoint(self, source_id: str) -> dict:
+        with self.connect() as connection:
+            row = connection.execute("SELECT cursor_json FROM live_checkpoints WHERE source_id = ?", (source_id,)).fetchone()
+        if not row:
+            return {}
+        try:
+            return json.loads(row[0] or "{}")
+        except json.JSONDecodeError:
+            return {}
+
+    def put_checkpoint(self, source_id: str, source_type: str, cursor: dict) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO live_checkpoints(source_id,source_type,cursor_json,updated_at) VALUES (?,?,?,?)",
+                (source_id, source_type, json.dumps(cursor, ensure_ascii=False), utc_now().isoformat()),
+            )
+
     def list_runs(self, limit: int = 100) -> List[dict]:
         with self.connect() as connection:
             rows = connection.execute("SELECT * FROM runs ORDER BY started_at DESC LIMIT ?", (limit,)).fetchall()
@@ -139,6 +218,11 @@ class SQLiteRepository:
     def put_chains(self, chains: List[AttackChain]) -> int:
         rows = [(c.chain_id, c.run_id, c.status, c.start_time.isoformat(), c.end_time.isoformat(), c.score, _json(c)) for c in chains]
         return self._insert_many("INSERT OR REPLACE INTO attack_chains VALUES (?,?,?,?,?,?,?)", rows)
+
+    def replace_chains_for_run(self, run_id: str, chains: List[AttackChain]) -> int:
+        with self.connect() as connection:
+            connection.execute("DELETE FROM attack_chains WHERE run_id = ?", (run_id,))
+        return self.put_chains(chains)
 
     def _insert_many(self, sql: str, rows: Iterable[Any]) -> int:
         rows = list(rows)
@@ -177,6 +261,7 @@ class SQLiteRepository:
     def _query_all_models(self, table: str, json_column: str, model: Type[T], where: List[str], params: List[Any], order_by: str, descending: bool = False) -> List[T]:
         allowed = {
             ("normalized_events", "event_json", "event_time"),
+            ("evidence", "evidence_json", "observed_at"),
             ("sessions", "session_json", "start_time"),
             ("detections", "detection_json", "created_at"),
             ("attack_chains", "chain_json", "start_time"),
@@ -293,6 +378,14 @@ class SQLiteRepository:
         if run_id:
             return self._query_models("evidence", "evidence_json", Evidence, ["run_id = ?"], [run_id], "observed_at", limit, offset, descending=True)
         return self._list_models("evidence", "evidence_json", Evidence, limit, offset)
+
+    def all_evidence(self, run_id: Optional[str] = None, descending: bool = False) -> List[Evidence]:
+        where: List[str] = []
+        params: List[Any] = []
+        if run_id:
+            where.append("run_id = ?")
+            params.append(run_id)
+        return self._query_all_models("evidence", "evidence_json", Evidence, where, params, "observed_at", descending=descending)
 
     def get_evidence(self, evidence_id: str) -> Optional[Evidence]:
         with self.connect() as connection:
