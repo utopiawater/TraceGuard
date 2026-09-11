@@ -270,6 +270,25 @@ def test_chain_builder_prefers_stronger_stage_representative_over_first_seen():
     assert chain.steps[0].detection_ids == [later_privilege.detection_id]
 
 
+def test_chain_builder_orders_correlated_steps_by_attack_stage_not_clock_jitter():
+    privilege = _detection(
+        "det.host.privilege_escalation",
+        "T1068",
+        0.9,
+        datetime(2026, 9, 9, 8, 34, 2, 100, tzinfo=timezone.utc),
+        "TA0004",
+    )
+    initial = _detection(
+        "det.auth.remote_interactive_logon",
+        "T1078",
+        0.78,
+        datetime(2026, 9, 9, 8, 34, 2, 200, tzinfo=timezone.utc),
+        "TA0001",
+    )
+    chain = DeterministicChainBuilder().build("run_chain_stage_order", [privilege, initial])[0]
+    assert [step.stage for step in chain.steps] == ["initial_access", "privilege_escalation"]
+
+
 def test_quick_fallback_aggregates_detection_findings_and_keeps_valid_evidence():
     detections = [
         _detection("det.host.sensitive_file_collection", "T1005", 0.88, datetime(2018, 4, 12, 18, index, tzinfo=timezone.utc))

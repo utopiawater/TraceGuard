@@ -38,7 +38,7 @@ def main() -> None:
         checks.append("登录与网络 Session")
         assert [item.rule_id for item in result.detections] == ["det.auth.remote_interactive_logon", "det.host.suspicious_powershell", "det.network.cross_source_interpreter_connection"]
         checks.append("规则注册、双源关联与 DetectionResult")
-        assert len(result.chains) == 1 and result.chains[0].technique_ids == ["T1059.001", "T1071.001"]
+        assert len(result.chains) == 1 and result.chains[0].technique_ids == ["T1078", "T1059.001", "T1071.001"]
         assert all(step.evidence_ids for step in result.chains[0].steps)
         checks.append("ATT&CK 映射、AttackChain 与 Evidence 外键")
         required_relations = {"SPAWNED", "INITIATED", "FROM", "TO", "USED_TECHNIQUE"}

@@ -1,11 +1,28 @@
 from fastapi.testclient import TestClient
 from pathlib import Path
 import json
+import time
 
 from app.bootstrap import build_pipeline
 from app.core.settings import Settings
 from app.main import create_app
 from app.scenarios import load_scenario
+
+
+def wait_for_case(client: TestClient, case_id: str, expected_roles: set[str], timeout: float = 5.0) -> dict:
+    deadline = time.monotonic() + timeout
+    last_payload = {}
+    while time.monotonic() < deadline:
+        response = client.get("/api/agents/%s" % case_id)
+        last_payload = response.json()
+        if response.status_code == 200:
+            detail = last_payload["data"]
+            roles = {item["agent_role"] for item in detail["tasks"]}
+            statuses = [item["status"] for item in detail["tasks"]]
+            if expected_roles <= roles and statuses and not any(item in {"queued", "running"} for item in statuses):
+                return detail
+        time.sleep(0.05)
+    raise AssertionError("agent investigation did not finish: %s" % last_payload)
 
 
 def test_health_and_empty_resources_are_explicit(tmp_path):
@@ -38,13 +55,14 @@ def test_agent_attribution_and_report_resources_use_persisted_results(tmp_path):
         started = client.post("/api/chains/%s/investigate" % chain.chain_id)
         assert started.status_code == 200
         case_id = started.json()["data"]["case_id"]
+        detail = wait_for_case(client, case_id, {"coordinator", "host", "network", "correlation", "attribution", "report"})
         agents = client.get("/api/agents").json()["data"]
         assert agents[0]["case_id"] == case_id
         dashboard = client.get("/api/dashboard").json()["data"]
         assert {item["status"] for item in dashboard["sources"]} == {"ingested"}
         sources = client.get("/api/sources").json()["data"]
         assert {item["status"] for item in sources} == {"ingested"}
-        assert client.get("/api/agents/%s" % case_id).json()["data"]["tasks"][-1]["agent_role"] == "report"
+        assert detail["tasks"][-1]["agent_role"] == "report"
         attribution = client.get("/api/attribution").json()["data"]
         assert attribution[0]["status"] == "candidate_analysis"
         assert {"group", "confidence", "matched_features"} <= set(attribution[0])
@@ -74,6 +92,6 @@ def test_quick_investigation_uses_existing_route_and_four_agent_scope(tmp_path):
         started = client.post("/api/chains/%s/investigate?scope=quick&max_steps=4" % chain.chain_id)
         assert started.status_code == 200
         assert started.json()["data"]["scope"] == "quick"
-        detail = client.get("/api/agents/%s" % started.json()["data"]["case_id"]).json()["data"]
+        detail = wait_for_case(client, started.json()["data"]["case_id"], {"coordinator", "host", "network", "correlation"})
         assert [item["agent_role"] for item in detail["tasks"]] == ["coordinator", "host", "network", "correlation"]
         assert all(item["scope"] == "quick" for item in detail["tasks"])

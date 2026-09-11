@@ -18,7 +18,12 @@ $env:TRACEGUARD_DATABASE_PATH = Join-Path $projectRoot "data\traceguard.db"
 $env:TRACEGUARD_RAW_ARCHIVE_DIR = Join-Path $projectRoot "data\raw"
 $env:TRACEGUARD_REPORT_DIR = Join-Path $projectRoot "data\reports"
 $env:TRACEGUARD_NEO4J_URI = "bolt://127.0.0.1:7687"
-$env:LLM_TIMEOUT_SECONDS = "180"
+if (-not $env:TRACEGUARD_DEFAULT_TIMEZONE) {
+    $env:TRACEGUARD_DEFAULT_TIMEZONE = "UTC+08:00"
+}
+if (-not $env:LLM_TIMEOUT_SECONDS) {
+    $env:LLM_TIMEOUT_SECONDS = "45"
+}
 
 & $python (Join-Path $PSScriptRoot "check_environment.py") --api-url $ApiUrl --frontend-url $FrontendUrl
 exit $LASTEXITCODE

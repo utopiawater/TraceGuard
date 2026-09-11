@@ -6,7 +6,7 @@ from pydantic import ValidationError
 
 from app.agents.harness import EvidenceValidator, Orchestrator, Tool, ToolGateway, default_agent_registry
 from app.agents.service import InvestigationService
-from app.agents.model import OpenAICompatibleModelClient
+from app.agents.model import ModelUnavailableError, OpenAICompatibleModelClient
 from app.agents.tools import build_tool_gateway
 from app.bootstrap import build_pipeline
 from app.contracts import AgentResult, AgentTask
@@ -104,6 +104,7 @@ def test_model_client_retries_one_invalid_json_response(monkeypatch):
             return {"choices": [{"message": {"content": content}}]}
     def fake_post(*args, **kwargs):
         calls.append(kwargs["json"])
+        assert kwargs["trust_env"] is False
         return Response()
     monkeypatch.setattr("app.agents.model.httpx.post", fake_post)
     client = OpenAICompatibleModelClient("https://model.example/v1", "secret", "fake-model")
@@ -125,6 +126,7 @@ def test_model_client_adapts_unsupported_server_schema_to_local_strict_validatio
             return {"choices": [{"message": {"content": '{"ok":true}'}}], "usage": {"prompt_tokens": 3, "completion_tokens": 2, "total_tokens": 5}}
     def fake_post(*args, **kwargs):
         calls.append(kwargs["json"])
+        assert kwargs["trust_env"] is False
         return Response(400 if len(calls) == 1 else 200)
     monkeypatch.setattr("app.agents.model.httpx.post", fake_post)
     client = OpenAICompatibleModelClient("https://model.example/v1", "secret", "fake-model")
@@ -145,6 +147,35 @@ class FailingModel:
     configured = True
     def complete_json(self, role, prompt_version, payload, schema):
         raise RuntimeError("model offline")
+
+
+class UnavailableModel:
+    configured = True
+    def __init__(self):
+        self.calls = 0
+    def complete_json(self, role, prompt_version, payload, schema):
+        self.calls += 1
+        raise ModelUnavailableError("model offline")
+
+
+class RequestFailedModel:
+    configured = True
+    def __init__(self):
+        self.calls = 0
+    def complete_json(self, role, prompt_version, payload, schema):
+        self.calls += 1
+        raise RuntimeError("model request failed: connection refused")
+
+
+class FirstTimeoutThenEchoModel:
+    configured = True
+    def __init__(self):
+        self.calls = 0
+    def complete_json(self, role, prompt_version, payload, schema):
+        self.calls += 1
+        if self.calls == 1:
+            raise RuntimeError("model request failed: The read operation timed out")
+        return payload["draft"]
 
 
 def test_coordinator_runs_parallel_specialists_and_persists_full_flow(tmp_path):
@@ -195,3 +226,35 @@ def test_model_failure_uses_deterministic_fallback_without_aborting(tmp_path):
     assert all(item["result"]["runtime"]["fallback"] for item in records)
     assert all(item["result"]["result"]["model_info"]["model"] == "fallback-v1" for item in records)
     assert all(any(error["code"] == "model_fallback" for error in item["result"]["result"]["errors"]) for item in records)
+
+
+def test_model_unavailable_short_circuits_remaining_agent_refinements(tmp_path):
+    settings, repo, graph, chain = seeded(tmp_path)
+    service = InvestigationService(repo, graph, settings)
+    service.model = UnavailableModel()
+    summary = service.investigate(chain.chain_id)
+    records = [item for item in repo.list_agent_records(100) if item["task"]["case_id"] == summary["case_id"]]
+    assert summary["status"] == "succeeded"
+    assert service.model.calls == 1
+    assert len(records) == 6
+    assert all(item["result"]["runtime"]["fallback"] for item in records)
+
+
+def test_model_request_failure_message_short_circuits_remaining_agent_refinements(tmp_path):
+    settings, repo, graph, chain = seeded(tmp_path)
+    service = InvestigationService(repo, graph, settings)
+    service.model = RequestFailedModel()
+    summary = service.investigate(chain.chain_id)
+    assert summary["status"] == "succeeded"
+    assert service.model.calls == 1
+
+
+def test_model_read_timeout_does_not_poison_following_agent_refinements(tmp_path):
+    settings, repo, graph, chain = seeded(tmp_path)
+    service = InvestigationService(repo, graph, settings)
+    service.model = FirstTimeoutThenEchoModel()
+    summary = service.investigate(chain.chain_id, scope="quick", max_steps=4)
+    records = [item for item in repo.list_agent_records(100) if item["task"]["case_id"] == summary["case_id"]]
+    assert summary["status"] == "succeeded"
+    assert service.model.calls == 4
+    assert sum(1 for item in records if item["result"]["runtime"]["fallback"]) == 1

@@ -4,6 +4,7 @@ import math
 import ntpath
 import os
 import posixpath
+from urllib.parse import parse_qsl, urlsplit
 from pathlib import Path
 from collections import Counter, defaultdict
 from fnmatch import fnmatch
@@ -209,6 +210,18 @@ def _network_bytes(event: UnifiedSecurityEvent) -> int:
     if not event.network:
         return 0
     return int(event.network.bytes_sent or 0) + int(event.network.bytes_received or 0)
+
+
+def _asset_hint_entity_ids(uri: str) -> List[str]:
+    hints = []
+    try:
+        query = urlsplit(uri).query
+    except ValueError:
+        query = ""
+    for key, value in parse_qsl(query, keep_blank_values=False):
+        if key.lower() in {"host", "hostname", "asset", "node"} and value.strip():
+            hints.append(value.strip().lower())
+    return sorted({stable_id("host", hint) for hint in hints})
 
 
 class SuspiciousPowerShellRule:
@@ -700,7 +713,10 @@ class HttpC2CandidateRule:
         for key, items in groups.items():
             items.sort(key=lambda item: item.event_time)
             event_ids = [item.event_id for item in items[:20]]
-            refs = sorted({ref.entity_id for item in items[:20] for ref in (item.host, item.object.ref) if ref})
+            refs = sorted(
+                {ref.entity_id for item in items[:20] for ref in (item.host, item.object.ref) if ref}
+                | {entity_id for item in items[:20] for entity_id in _asset_hint_entity_ids(str(item.network.http.get("uri") or ""))}
+            )
             results.append(DetectionResult(
                 detection_id=stable_id("det", self.rule_id, self.version, key, event_ids),
                 run_id=run_id,

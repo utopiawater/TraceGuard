@@ -68,6 +68,7 @@ class OpenAICompatibleModelClient:
                 headers={"Authorization": "Bearer %s" % self.api_key, "Content-Type": "application/json"},
                 json=body,
                 timeout=self.timeout_seconds,
+                trust_env=False,
             )
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:

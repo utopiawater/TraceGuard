@@ -1,6 +1,9 @@
+from datetime import datetime, timezone
 from pathlib import Path
 
-from app.normalizers import AuditdAdapter, NormalizerRegistry, SysmonAdapter, WindowsSecurityAdapter, WazuhAdapter, ZeekAdapter
+from app.contracts import RawEventEnvelope, SourceDescriptor
+from app.contracts.common import SourceKind
+from app.normalizers import ApplicationWebAdapter, AuditdAdapter, NormalizerRegistry, SysmonAdapter, WindowsSecurityAdapter, WazuhAdapter, ZeekAdapter
 from app.scenarios import load_scenario
 
 
@@ -31,6 +34,24 @@ def test_auditd_compound_and_wazuh_fixtures_normalize():
     wazuh = next(event for event in events if event.source.kind.value == "wazuh")
     assert wazuh.action == "registry.modify"
     assert wazuh.object.ref.entity_type == "registry"
+
+
+def test_application_log_without_timezone_uses_configured_default(monkeypatch):
+    monkeypatch.setenv("TRACEGUARD_DEFAULT_TIMEZONE", "UTC+08:00")
+    now = datetime(2026, 9, 11, tzinfo=timezone.utc)
+    raw = RawEventEnvelope(
+        raw_id="raw_c2_access",
+        source=SourceDescriptor(kind=SourceKind.application, product="nginx", dataset="c2.http", sensor_id="c2-http"),
+        observed_time=now,
+        ingested_time=now,
+        payload_format="text",
+        payload='10.0.2.208 - - [09/Sep/2026 15:56:22] "GET /beacon?host=N4-Web&stage=c2 HTTP/1.1" 200 -',
+        raw_ref="raw://c2",
+        raw_sha256="sha",
+    )
+    event = ApplicationWebAdapter().normalize(raw)[0]
+    assert event.event_time.isoformat() == "2026-09-09T07:56:22+00:00"
+    assert event.network and event.network.http["uri"] == "/beacon?host=N4-Web&stage=c2"
 
 
 def test_host_and_network_behavior_fixture_coverage():

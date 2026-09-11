@@ -8,6 +8,7 @@ from app.correlation import CorrelationEngine
 
 TACTIC_STAGE = {"TA0001": "initial_access", "TA0002": "execution", "TA0003": "persistence", "TA0004": "privilege_escalation", "TA0006": "credential_access", "TA0007": "discovery", "TA0008": "lateral_movement", "TA0009": "collection", "TA0011": "command_and_control", "TA0010": "exfiltration"}
 MAINLINE = {"initial_access", "execution", "command_and_control", "lateral_movement", "privilege_escalation", "collection", "exfiltration"}
+STAGE_ORDER = {stage: index for index, stage in enumerate(("initial_access", "execution", "command_and_control", "lateral_movement", "privilege_escalation", "collection", "exfiltration"))}
 SEVERITY_ORDER = {"informational": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 INFERRED_MAPPINGS = {
     "det.auth.remote_interactive_logon": AttackMapping(technique_id="T1078", tactic_ids=["TA0001"], mapping_rule_id="chain.infer.valid_accounts", attack_version="19.2", confidence=0.62),
@@ -45,7 +46,7 @@ class DeterministicChainBuilder:
             current = representatives.get(stage)
             if current is None or self._stage_representative_key(detection) > self._stage_representative_key(current):
                 representatives[stage] = detection
-        eligible = sorted(representatives.values(), key=lambda item: (item.created_at, SEVERITY_ORDER[item.severity], item.detection_id))
+        eligible = sorted(representatives.values(), key=lambda item: (STAGE_ORDER.get(self._stage(item), len(STAGE_ORDER)), item.created_at, item.detection_id))
         steps: List[ChainStep] = []
         for index, detection in enumerate(eligible):
             mapping = self._mapping(detection)
@@ -123,3 +124,8 @@ class DeterministicChainBuilder:
         if detection.attack_mappings:
             return detection.attack_mappings[0]
         return INFERRED_MAPPINGS.get(detection.rule_id)
+
+    @staticmethod
+    def _stage(detection: DetectionResult) -> str:
+        mapping = DeterministicChainBuilder._mapping(detection)
+        return TACTIC_STAGE.get(mapping.tactic_ids[0], "execution") if mapping else "execution"

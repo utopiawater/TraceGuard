@@ -66,7 +66,12 @@ $env:TRACEGUARD_LIVE_POLL_INTERVAL_SECONDS = "1"
 $env:TRACEGUARD_LIVE_MICRO_BATCH_SIZE = "200"
 $env:TRACEGUARD_NEO4J_ENABLED = if ($neo4jEnabled) { "true" } else { "false" }
 $env:TRACEGUARD_NEO4J_URI = "bolt://127.0.0.1:7687"
-$env:LLM_TIMEOUT_SECONDS = "180"
+if (-not $env:TRACEGUARD_DEFAULT_TIMEZONE) {
+    $env:TRACEGUARD_DEFAULT_TIMEZONE = "UTC+08:00"
+}
+if (-not $env:LLM_TIMEOUT_SECONDS) {
+    $env:LLM_TIMEOUT_SECONDS = "45"
+}
 $env:PYTHONUNBUFFERED = "1"
 $env:PYTHONPATH = Join-Path $projectRoot "backend"
 

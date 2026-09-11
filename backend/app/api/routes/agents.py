@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import datetime
 from typing import Dict, List
 
 from typing import Optional
@@ -13,12 +14,35 @@ from app.repositories import SQLiteRepository
 router = APIRouter(tags=["agents"])
 
 
+def _parse_time(value: Optional[str]) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _is_stale_running_task(task: dict, runtime: dict, result: Optional[dict]) -> bool:
+    if result or task.get("state") not in {"queued", "running"}:
+        return False
+    started = _parse_time(runtime.get("started_at") or runtime.get("created_at"))
+    if not started:
+        return False
+    deadline_ms = int((task.get("constraints") or {}).get("deadline_ms") or 60000)
+    elapsed_ms = (datetime.now(started.tzinfo) - started).total_seconds() * 1000
+    return elapsed_ms > max(deadline_ms, 60000)
+
+
 def _task_view(record: dict) -> dict:
     task, runtime = record["task"], record["runtime"]
     result_wrapper = record.get("result") or {}
     result = result_wrapper.get("result")
     status = result.get("status") if result else task["state"]
-    execution_mode = "pending" if not result else ("deterministic_fallback" if runtime.get("model_fallback", False) else "real_llm")
+    stale = _is_stale_running_task(task, runtime, result)
+    if stale:
+        status = "failed"
+    execution_mode = "timeout" if stale else ("pending" if not result else ("deterministic_fallback" if runtime.get("model_fallback", False) else "real_llm"))
     return {
         **task, "status": status, "started_at": runtime.get("started_at"), "finished_at": runtime.get("finished_at"),
         "created_at": runtime.get("created_at"), "status_history": runtime.get("status_history", []),
@@ -26,6 +50,7 @@ def _task_view(record: dict) -> dict:
         "chain_id": runtime.get("chain_id"), "investigation_id": runtime.get("investigation_id"),
         "scope": runtime.get("scope", "full"), "execution_mode": execution_mode,
         "model_fallback": runtime.get("model_fallback", False), "error": runtime.get("error"),
+        "stale": stale,
         "result": result, "artifact": result_wrapper.get("artifact", {}),
     }
 

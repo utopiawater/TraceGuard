@@ -15,7 +15,12 @@ foreach ($entry in $state.processes) {
     $actualStart = $process.StartTime.ToUniversalTime()
     $expectedStart = [datetime]::Parse([string]$entry.started_at).ToUniversalTime()
     $sameStart = [Math]::Abs(($actualStart - $expectedStart).TotalSeconds) -lt 2
-    $samePath = [System.IO.Path]::GetFullPath($process.Path) -eq [System.IO.Path]::GetFullPath([string]$entry.path)
+    $actualPath = [string]$process.Path
+    $expectedPath = [string]$entry.path
+    $samePath = $true
+    if (-not [string]::IsNullOrWhiteSpace($actualPath) -and -not [string]::IsNullOrWhiteSpace($expectedPath)) {
+        $samePath = [System.IO.Path]::GetFullPath($actualPath) -eq [System.IO.Path]::GetFullPath($expectedPath)
+    }
     if (-not ($sameStart -and $samePath)) {
         Write-Warning "Skipped PID $($entry.id): process identity no longer matches the recorded TraceGuard process."
         continue

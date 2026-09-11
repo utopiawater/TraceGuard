@@ -7,7 +7,7 @@ from typing import Any, Dict, Iterable, List, Literal, Optional, Set, Tuple
 from uuid import uuid4
 
 from app.agents.harness import EvidenceValidator, default_agent_registry
-from app.agents.model import OpenAICompatibleModelClient
+from app.agents.model import ModelUnavailableError, OpenAICompatibleModelClient
 from app.agents.tools import build_tool_gateway
 from app.attribution import AttackFingerprint, analyze_c2, rank_groups
 from app.contracts import AgentFinding, AgentResult, AgentTask, AttackChain, DetectionResult
@@ -22,6 +22,24 @@ HOST_RULE_PREFIXES = ("det.host.", "det.auth.")
 NETWORK_RULE_PREFIXES = ("det.network.",)
 
 
+def _should_circuit_model(message: str) -> bool:
+    lowered = message.lower()
+    return any(
+        token in lowered
+        for token in (
+            "winerror 10061",
+            "actively refused",
+            "connection refused",
+            "connecterror",
+            "not fully configured",
+            "model offline",
+            "name or service not known",
+            "nodename nor servname",
+            "temporary failure in name resolution",
+        )
+    )
+
+
 class InvestigationService:
     def __init__(self, repo: SQLiteRepository, graph, settings) -> None:
         self.repo, self.graph, self.settings = repo, graph, settings
@@ -33,6 +51,7 @@ class InvestigationService:
             settings.llm_base_url, settings.llm_api_key, settings.llm_model, settings.llm_timeout_seconds,
         )
         self._task_runtime: Dict[str, dict] = {}
+        self._model_unavailable_reason: Optional[str] = None
 
     def investigate(
         self,
@@ -152,10 +171,20 @@ class InvestigationService:
     def _invoke(self, task: AgentTask, name: str, arguments: dict) -> dict:
         return self.gateway.invoke(task, self.registry, name, arguments)
 
+    def _graph_connected(self) -> bool:
+        if not hasattr(self.graph, "status"):
+            return False
+        try:
+            return bool(self.graph.status().get("connected"))
+        except Exception:
+            return False
+
     def _finish(self, task: AgentTask, chain: AttackChain, draft: AgentResult, context: dict, artifact: Optional[dict] = None) -> AgentResult:
         evidence_ids = set(self.repo.evidence_ids_for_run(chain.run_id))
         used_fallback, fallback_message, token_usage = False, None, {}
         try:
+            if self._model_unavailable_reason:
+                raise ModelUnavailableError(self._model_unavailable_reason)
             payload = self.model.complete_json(
                 task.agent_role, self.registry.get(task.agent_role).prompt_version,
                 {"instruction": "Refine the verified draft without changing identifiers or introducing facts.", "verified_context": context, "draft": draft.model_dump(mode="json")},
@@ -175,6 +204,8 @@ class InvestigationService:
                 raise ValueError("; ".join(errors))
         except Exception as exc:
             used_fallback, fallback_message = True, str(exc)
+            if _should_circuit_model(fallback_message):
+                self._model_unavailable_reason = fallback_message
             result = draft.model_copy(update={
                 "tool_calls": self.gateway.audit_for(task.task_id),
                 "errors": list(draft.errors) + [StructuredError(code="model_fallback", message=fallback_message, retryable=True)],
@@ -222,7 +253,11 @@ class InvestigationService:
         event_data = self._invoke(running, "event_search", {"run_id": chain.run_id, "actions": actions, "limit": 60 if quick else 200})
         session_data = {"sessions": [], "count": 0} if quick else self._invoke(running, "session_lookup", {"run_id": chain.run_id, "session_type": "login", "limit": 100})
         timeline_data = {"events": []} if quick else (self._invoke(running, "entity_timeline", {"run_id": chain.run_id, "entity_id": chain.entity_ids[0], "limit": 100}) if chain.entity_ids else {"events": []})
-        graph_data = {"nodes": [], "edges": []} if quick else (self._invoke(running, "graph_neighbors", {"run_id": chain.run_id, "entity_id": chain.entity_ids[0], "depth": 2, "limit": 100}) if chain.entity_ids else {"nodes": [], "edges": []})
+        graph_data = (
+            {"nodes": [], "edges": [], "skipped": "graph backend is not connected"}
+            if quick or not self._graph_connected()
+            else (self._invoke(running, "graph_neighbors", {"run_id": chain.run_id, "entity_id": chain.entity_ids[0], "depth": 2, "limit": 100}) if chain.entity_ids else {"nodes": [], "edges": []})
+        )
         evidence_ids = sorted({evidence for item in detections for evidence in item.evidence_ids})
         evidence_data = self._invoke(running, "evidence_get", {"run_id": chain.run_id, "ids": evidence_ids[:50]}) if evidence_ids else {"evidence": []}
         findings = self._aggregate_detection_findings(detections) if quick else [self._detection_finding(item) for item in detections]
@@ -237,7 +272,11 @@ class InvestigationService:
         detection_data = self._invoke(running, "detection_lookup", {"run_id": chain.run_id, "ids": [item.detection_id for item in detections[:50]]}) if detections else {"detections": []}
         event_data = self._invoke(running, "event_search", {"run_id": chain.run_id, "actions": ["network.", "dns.", "http.", "icmp."], "source_kinds": ["zeek", "dataset"], "limit": 60 if quick else 200})
         session_data = {"sessions": [], "count": 0} if quick else self._invoke(running, "session_lookup", {"run_id": chain.run_id, "session_type": "network", "limit": 100})
-        graph_data = {"nodes": [], "edges": []} if quick else (self._invoke(running, "graph_neighbors", {"run_id": chain.run_id, "entity_id": chain.entity_ids[-1], "depth": 2, "limit": 100}) if chain.entity_ids else {"nodes": [], "edges": []})
+        graph_data = (
+            {"nodes": [], "edges": [], "skipped": "graph backend is not connected"}
+            if quick or not self._graph_connected()
+            else (self._invoke(running, "graph_neighbors", {"run_id": chain.run_id, "entity_id": chain.entity_ids[-1], "depth": 2, "limit": 100}) if chain.entity_ids else {"nodes": [], "edges": []})
+        )
         evidence_ids = sorted({evidence for item in detections for evidence in item.evidence_ids})
         evidence_data = self._invoke(running, "evidence_get", {"run_id": chain.run_id, "ids": evidence_ids[:50]}) if evidence_ids else {"evidence": []}
         findings = self._aggregate_detection_findings(detections) if quick else [self._detection_finding(item) for item in detections]
@@ -252,7 +291,7 @@ class InvestigationService:
         chain_data = self._invoke(running, "chain_lookup", {"chain_id": chain.chain_id})
         validation = self._invoke(running, "chain_validate", {"chain_id": chain.chain_id})
         path = {"found": False, "relations": []}
-        if not quick and len(chain.entity_ids) >= 2:
+        if not quick and self._graph_connected() and len(chain.entity_ids) >= 2:
             path = self._invoke(running, "graph_path", {"run_id": chain.run_id, "source_entity_id": chain.entity_ids[0], "target_entity_id": chain.entity_ids[-1], "max_depth": 6, "max_edges": 3000})
         findings = [AgentFinding(
             claim="链步骤“%s”保持为确定性主管道生成结果；Agent 仅验证其时间、检测、实体、证据和前驱引用。" % step.stage,

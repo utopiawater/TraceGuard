@@ -11,6 +11,7 @@ from app.detection.rules import (
     CollectionArchiveCorrelationRule,
     ExecutionCleanupRule,
     ForkExecTempRule,
+    HttpC2CandidateRule,
     IngressToolTransferRule,
     PermissionThenExecutionRule,
     SensitiveReadBurstRule,
@@ -20,6 +21,7 @@ from app.detection.rules import (
     TempExecNetworkRule,
     TempFileLifecycleRule,
 )
+from app.core.ids import stable_id
 
 
 BASE = datetime(2026, 9, 11, 1, 0, tzinfo=timezone.utc)
@@ -133,6 +135,20 @@ def test_beaconing_session_requires_periodic_outbound_anchor():
     assert detection.feature_values["request_count"] == 6
     jitter = [_net(index, "network.connect", proc="agent") for index in (1, 2, 50, 55, 140)]
     assert _run(BeaconingSessionRule(), jitter) == []
+
+
+def test_http_c2_candidate_links_uri_host_hint_to_asset_entity():
+    network = NetworkContext(
+        session_id="sess_c2",
+        direction="inbound",
+        transport="tcp",
+        application="http",
+        src=NetworkEndpoint(ip="10.0.3.119", port=51000),
+        dst=NetworkEndpoint(ip="10.0.2.208", port=80, host_id="host_c2"),
+        http={"uri": "/beacon?host=N8-Core&stage=c2", "user_agent": "curl"},
+    )
+    detection = _run(HttpC2CandidateRule(), [_event(1, "http.request", host="host_c2", network=network)])[0]
+    assert stable_id("host", "n8-core") in detection.entity_ids
 
 
 def test_sensitive_read_burst_requires_three_distinct_sensitive_paths(monkeypatch):
