@@ -300,7 +300,8 @@ def discover_dataset_reports(settings_data_dir: Path, project_root: Path) -> Lis
         project_root / "data" / "dataset_e3" / "dataset_run_report.json",
     ]
     candidates.extend((project_root / "data").glob("*/dataset_run_report.json") if (project_root / "data").exists() else [])
-    reports = []
+    reports_by_run: Dict[str, Dict[str, Any]] = {}
+    reports_without_run = []
     seen = set()
     for path in candidates:
         path = path.resolve()
@@ -311,7 +312,14 @@ def discover_dataset_reports(settings_data_dir: Path, project_root: Path) -> Lis
             payload = _load_json(path)
             payload["report_path"] = str(path)
             payload["report_mtime"] = path.stat().st_mtime
-            reports.append(payload)
+            run_id = str(payload.get("run_id") or "")
+            if not run_id:
+                reports_without_run.append(payload)
+                continue
+            current = reports_by_run.get(run_id)
+            if current is None or float(payload.get("report_mtime") or 0) > float(current.get("report_mtime") or 0):
+                reports_by_run[run_id] = payload
         except (OSError, json.JSONDecodeError):
             continue
+    reports = [*reports_by_run.values(), *reports_without_run]
     return sorted(reports, key=lambda item: (item.get("report_mtime") or 0, item.get("run_id") or ""), reverse=True)

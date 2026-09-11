@@ -98,6 +98,8 @@ data/reports/*
 data/analysis_tasks/*
 data/dataset_*/raw/*
 data/dataset_*/reports/*
+data/dataset_e3_after_full_pipeline/
+data/eval_behavior_*/
 data/dataset_e3_generalization/
 data/test_tmp_*/
 data/self_check_tmp/
@@ -137,6 +139,9 @@ datasets/*
 !datasets/**/sample*.json
 datasets/darpa_tc_e3_cadets/processed_dataset/*
 datasets/darpa_tc_e3_cadets/source_metadata/*
+datasets/darpa_tc_e3_cadets/agent_input.json
+datasets/darpa_tc_e3_cadets/dataset_analysis_report.json
+datasets/darpa_tc_e3_cadets/dataset_analysis_report.md
 
 
 # ---------------------------------------------------------

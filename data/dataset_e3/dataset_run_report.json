@@ -4,7 +4,7 @@
   "source": "DARPA Transparent Computing E3 / ta1-cadets-e3-official-2",
   "scenario": "E3-CADETS-20180412-nginx",
   "scenario_description": "TC_Ground_Truth_Report_E3_Update.pdf section 3.13, PDF pages 26-29 (printed 23-26)",
-  "run_id": "run_darpa_tc_e3_001",
+  "run_id": "run_darpa_after_full_pipeline",
   "status": "completed",
   "input_records": 20776,
   "records": 20776,
@@ -26,11 +26,10 @@
     "file.open": 391,
     "network.send": 167,
     "memory.protect": 85,
+    "process.start": 44,
     "process.ipc": 30,
-    "privilege.change": 25,
     "file.write": 25,
-    "process.start": 24,
-    "process.execute": 20,
+    "privilege.change": 25,
     "process.stop": 17,
     "network.accept": 13,
     "network.connect": 10,
@@ -69,57 +68,54 @@
     "aue_vfork": 2,
     "aue_writev": 2
   },
-  "entity_count": 461,
+  "entity_count": 437,
   "session_count": 16,
-  "detection_count": 348,
+  "detection_count": 314,
   "detection_rule_counts": {
     "det.host.sensitive_file_collection": 156,
-    "det.host.memory_tampering": 85,
     "det.network.service_process_external_connection": 68,
-    "det.host.privilege_escalation": 25,
-    "det.host.temp_directory_execution": 13,
-    "det.network.service_scanning": 1
+    "det.network.anchored_peer_traffic": 41,
+    "det.host.fork_exec_temp": 14,
+    "det.host.permission_then_execution": 8,
+    "det.host.ingress_tool_transfer": 6,
+    "det.host.temp_file_lifecycle": 6,
+    "det.host.suspicious_file_staging": 6,
+    "det.host.execution_cleanup": 4,
+    "det.network.temp_exec_network": 3,
+    "det.network.service_scanning": 1,
+    "det.network.suspicious_service_session": 1
   },
   "evidence_count": 20776,
   "attack_technique_ids": [
     "T1005",
     "T1046",
-    "T1055",
     "T1059",
-    "T1068",
-    "T1071.001"
+    "T1059.004",
+    "T1070.004",
+    "T1071.001",
+    "T1105",
+    "T1222.002"
   ],
   "technique_ids": [
     "T1005",
     "T1046",
-    "T1055",
     "T1059",
-    "T1068",
-    "T1071.001"
+    "T1059.004",
+    "T1070.004",
+    "T1071.001",
+    "T1105",
+    "T1222.002"
   ],
-  "attack_technique_count": 6,
-  "technique_count": 6,
+  "attack_technique_count": 8,
+  "technique_count": 8,
   "attack_chain_count": 1,
   "chain_count": 1,
   "attack_chains": [
     {
-      "chain_id": "chain_ab5642f031db21f94ecd8e8a",
-      "score": 0.684,
-      "completeness": 0.571,
+      "chain_id": "chain_9241a90bf46e16214f18e26d",
+      "score": 0.712,
+      "completeness": 0.429,
       "steps": [
-        {
-          "stage": "command_and_control",
-          "technique_id": "T1071.001",
-          "detection_ids": [
-            "det_4beddb5ecba0e7553bc88c55"
-          ],
-          "event_ids": [
-            "evt_5fa877d17dd2d43a59b8be2e"
-          ],
-          "evidence_ids": [
-            "evd_ee68b7ca50200386c0b8d2f9"
-          ]
-        },
         {
           "stage": "collection",
           "technique_id": "T1005",
@@ -134,104 +130,140 @@
           ]
         },
         {
-          "stage": "execution",
-          "technique_id": "T1059",
+          "stage": "command_and_control",
+          "technique_id": "T1105",
           "detection_ids": [
-            "det_26d674fdcdb2949b454cec60"
+            "det_2b153e53c43d0d59e5a3bcc3"
           ],
           "event_ids": [
+            "evt_1bf001cc85d987f9be30597a",
+            "evt_1f626544a57c32d9a9718c0f",
+            "evt_2fae5ee14d8dea09a9926468",
+            "evt_516d7df81ce93e41336ee1c3",
+            "evt_584754b983c8aed7cd2df6e5",
+            "evt_83d4cc017c14de7d8af65fe3",
+            "evt_846ebe73e45f5b780ae2d5d2",
+            "evt_b2b26521a7ad38452223b949",
+            "evt_d96610160a1ceb46a359ab90",
+            "evt_fab0c966d88b0f7b0d6b046c",
+            "evt_a2dfc9013133368dd72b7ef8",
             "evt_dad058a367d11739ae83a71b"
           ],
           "evidence_ids": [
-            "evd_4a30a1edd67475cfb4352cc6"
+            "evd_0e74ab65b2488bce44391295",
+            "evd_16a27e05b880b9c1dd8710cb",
+            "evd_4485d54af81f313e40e53e27",
+            "evd_4a30a1edd67475cfb4352cc6",
+            "evd_705e61bc80a93692202db153",
+            "evd_80e796c44bef12205e6aa63b",
+            "evd_811d04a64c4c1efa497ab0fa",
+            "evd_83e615975799ae3d5bf456a9",
+            "evd_dd8230b90a1636993c56a253",
+            "evd_e8a77cc2a725a96845243b62",
+            "evd_ef6080361163966c827c40b3",
+            "evd_ff71bfa081522a24dfecf4e3"
           ]
         },
         {
-          "stage": "privilege_escalation",
-          "technique_id": "T1068",
+          "stage": "execution",
+          "technique_id": "T1059",
           "detection_ids": [
-            "det_0ed5bdab14760a91a6af16ba"
+            "det_3f90bb9607eaeae977467271"
           ],
           "event_ids": [
-            "evt_b3c6033a69db90fdad481d7f"
+            "evt_0eb12a97785f52eb4157f509",
+            "evt_d1df98aa9498575319f2ac25",
+            "evt_a460616bd2f9bf625eadd9a2",
+            "evt_5ff9290044eab944cffbc7af",
+            "evt_2f715dd61d8fc6218e3ecda3",
+            "evt_9e49acba4c5ebc6b546edfc2"
           ],
           "evidence_ids": [
-            "evd_3d740acf6f600ebf5a0cff33"
+            "evd_35ffb25e14e854e4d2e1c65b",
+            "evd_691216b9230962dcb1fa9b40",
+            "evd_6f7553bbd0d63a7754c33232",
+            "evd_77705026f2b233722df6180c",
+            "evd_c9670e7cc685c0e115c06795",
+            "evd_f56e016e867b58e1fdcc4572"
           ]
         }
       ],
       "evidence_ids": [
+        "evd_0e74ab65b2488bce44391295",
+        "evd_16a27e05b880b9c1dd8710cb",
         "evd_1ec9e8124a05cb292de3f8d3",
-        "evd_3d740acf6f600ebf5a0cff33",
+        "evd_35ffb25e14e854e4d2e1c65b",
+        "evd_4485d54af81f313e40e53e27",
         "evd_4a30a1edd67475cfb4352cc6",
-        "evd_ee68b7ca50200386c0b8d2f9"
+        "evd_691216b9230962dcb1fa9b40",
+        "evd_6f7553bbd0d63a7754c33232",
+        "evd_705e61bc80a93692202db153",
+        "evd_77705026f2b233722df6180c",
+        "evd_80e796c44bef12205e6aa63b",
+        "evd_811d04a64c4c1efa497ab0fa",
+        "evd_83e615975799ae3d5bf456a9",
+        "evd_c9670e7cc685c0e115c06795",
+        "evd_dd8230b90a1636993c56a253",
+        "evd_e8a77cc2a725a96845243b62",
+        "evd_ef6080361163966c827c40b3",
+        "evd_f56e016e867b58e1fdcc4572",
+        "evd_ff71bfa081522a24dfecf4e3"
       ]
     }
   ],
   "ioc_coverage": {
-    "covered": 99,
+    "covered": 591,
     "total": 776,
-    "rate": 0.127577
+    "rate": 0.761598
   },
   "ioc_coverage_analysis": {
-    "uncovered_ioc_events": 677,
+    "uncovered_ioc_events": 185,
     "action_distribution": {
-      "aue_recvfrom": 551,
-      "aue_sendto": 94,
-      "aue_open_rwtc": 8,
-      "aue_chmod": 8,
-      "aue_unlink": 7,
+      "aue_recvfrom": 162,
+      "aue_sendto": 14,
       "aue_close": 3,
-      "aue_connect": 3,
-      "aue_execve": 3
+      "aue_unlink": 3,
+      "aue_open_rwtc": 2,
+      "aue_execve": 1
     },
     "event_type_distribution": {
-      "recvfrom": 551,
-      "sendto": 94,
-      "open": 8,
-      "modify_file_attributes": 8,
-      "unlink": 7,
+      "recvfrom": 162,
+      "sendto": 14,
       "close": 3,
-      "connect": 3,
-      "execute": 3
+      "unlink": 3,
+      "open": 2,
+      "execute": 1
     },
     "process_distribution": {
-      "nginx": 351,
-      "XIM": 287,
-      "test": 36,
-      "sshd": 2,
-      "cron": 1
+      "nginx": 135,
+      "XIM": 48,
+      "test": 1,
+      "sshd": 1
     },
     "selection_reason_distribution": {
-      "official_network_ioc": 651,
-      "official_file_ioc": 26
+      "official_network_ioc": 179,
+      "official_file_ioc": 6
     },
-    "network_ioc_events": 651,
-    "file_ioc_events": 26,
+    "network_ioc_events": 179,
+    "file_ioc_events": 6,
     "top_file_paths": {
-      "/var/log/sendmail": 5,
-      "/var/log/netlog": 4,
-      "/tmp/tmux-1002": 3,
-      "/tmp/font": 3,
-      "/tmp/XIM": 3,
-      "/tmp/main": 3,
-      "/tmp/test": 3,
-      "/tmp/minions": 2
+      "/var/log/sendmail": 3,
+      "/var/log/netlog": 2,
+      "/tmp/test": 1
     },
-    "low_semantic_syscall_events": 648,
-    "low_semantic_rate": 0.957164,
+    "low_semantic_syscall_events": 179,
+    "low_semantic_rate": 0.967568,
     "assessment": "未覆盖 IOC 主要由重复网络收发系统调用构成；少量文件 IOC 属于落地、chmod、unlink、执行序列，应作为后续通用规则候选而不是本次用 Ground Truth 追指标。",
     "potential_detection_gaps": [
       "可考虑后续增加通用文件落地/授权变更/删除序列检测，但本次未为提高 IOC coverage 自动新增规则。"
     ]
   },
   "stage_coverage": {
-    "covered": 4,
+    "covered": 3,
     "total": 4,
-    "rate": 1.0,
+    "rate": 0.75,
     "stages": [
       "execution",
-      "privilege_escalation",
       "collection",
       "command_and_control"
     ]
@@ -239,13 +271,13 @@
   "evidence_backtrace_rate": 1.0,
   "chain_evidence_coverage": [
     {
-      "chain_id": "chain_ab5642f031db21f94ecd8e8a",
-      "covered": 4,
-      "total": 4
+      "chain_id": "chain_9241a90bf46e16214f18e26d",
+      "covered": 3,
+      "total": 3
     }
   ],
-  "runtime_seconds": 221.934,
-  "events_per_second": 93.614,
+  "runtime_seconds": 336.94,
+  "events_per_second": 61.661,
   "precision": null,
   "recall": null,
   "f1": null,
@@ -372,24 +404,5 @@
     "event_id_format": "cadets:record:<original-record-number>",
     "unique_event_ids": 20776
   },
-  "multi_agent": {
-    "case_id": "case_b9742e5aa7e5470f",
-    "chain_id": "chain_ab5642f031db21f94ecd8e8a",
-    "status": "succeeded",
-    "created_at": "2026-09-08T15:21:39.179369+00:00",
-    "finished_at": "2026-09-08T15:21:42.288364+00:00",
-    "final_confidence": 0.7654,
-    "scope": "quick",
-    "task_ids": [
-      "task_fa824e456c9247ffb62f",
-      "task_a2aa53eb04c742d5bbdf",
-      "task_36d81cda76384379a4fa",
-      "task_b5528271edd541629da0"
-    ],
-    "report_ids": [],
-    "model": {
-      "configured": false,
-      "model": "deterministic-fallback"
-    }
-  }
+  "multi_agent": null
 }
